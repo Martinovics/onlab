@@ -8,11 +8,9 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.tasks.Task
 import com.onlab.oauth.databinding.ActivityMainBinding
 
 
@@ -34,7 +32,6 @@ class MainActivity : AppCompatActivity() {
         this.binding = ActivityMainBinding.inflate(layoutInflater)
 
 
-
         this.gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                    .requestEmail()
                    .build()
@@ -42,14 +39,18 @@ class MainActivity : AppCompatActivity() {
 
         this.signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
-                handleSignInResult(result.data)
+                handleSignIn(result.data)
             }
         }
 
-        // todo check for existing user signed in
+
+        val account = GoogleSignIn.getLastSignedInAccount(this)
+        if (account != null) {  // már be van jelentkezve
+            switchToLoggedInActivity()
+        }
+
 
         this.binding.btnSignIn.setOnClickListener { this.signIn() }
-        this.binding.btnSignOut.setOnClickListener { this.signOut() }
 
         setContentView(this.binding.root)
     }
@@ -57,51 +58,36 @@ class MainActivity : AppCompatActivity() {
 
 
 
+    private fun switchToLoggedInActivity() {
+        val intent = Intent(this, LoggedInActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(intent)
+    }
 
-    private fun handleSignInResult(data: Intent?) {
+
+
+
+    private fun handleSignIn(data: Intent?) {
         val task = GoogleSignIn.getSignedInAccountFromIntent(data)
         try {
             val account = task.getResult(ApiException::class.java)
 
             // Signed in successfully, show authenticated UI.
-
-            this.binding.tvGreet.text = "Hello, ${account.displayName}!"
-
-            Log.d(TAG, "Name: $account.displayName")
+            Log.d(TAG, "Logged in as ${account.displayName}")
+            this.switchToLoggedInActivity()
         } catch (e: ApiException) {
             Log.w(TAG, "signInResult:failed code=" + e.statusCode)
         }
     }
 
 
+
+
     private fun signIn() {
         val signInIntent = this.gsc.signInIntent
         this.signInLauncher.launch(signInIntent)
     }
-
-
-
-    private fun handleSignOut(task: Task<Void>) {
-        if (task.isSuccessful) {
-            // Sign-out succeeded, update UI and launch the login activity
-            // TODO: update UI and launch login activity
-            this.binding.tvGreet.text = "Hello, World!"
-            Log.d(TAG, "Sign-out succeeded")
-        } else {
-            // Sign-out failed, display an error message
-            Log.w(TAG, "Sign-out failed")
-        }
-    }
-
-
-
-    private fun signOut() {
-        this.gsc.signOut().addOnCompleteListener(this) { task ->
-            this.handleSignOut(task)
-        }
-    }
-
-
 
 
 }
