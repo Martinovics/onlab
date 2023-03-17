@@ -14,6 +14,8 @@ import com.google.android.gms.common.api.ApiException
 import com.onlab.oauth.databinding.ActivityMainBinding
 
 
+
+
 class MainActivity : AppCompatActivity() {
 
 
@@ -73,7 +75,6 @@ class MainActivity : AppCompatActivity() {
         try {
             val account = task.getResult(ApiException::class.java)
 
-            // Signed in successfully, show authenticated UI.
             Log.d(TAG, "Logged in as ${account.displayName}")
             this.switchToLoggedInActivity()
         } catch (e: ApiException) {
