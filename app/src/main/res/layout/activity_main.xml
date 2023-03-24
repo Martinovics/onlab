@@ -10,20 +10,10 @@
         android:id="@+id/tvGreet"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="You are currently signed-out"
+        android:text="Hello, World!"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
-    <Button
-        android:id="@+id/btnSignIn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Sign-in with google"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tvGreet" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
