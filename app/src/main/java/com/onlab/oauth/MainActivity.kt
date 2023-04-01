@@ -1,9 +1,9 @@
 package com.onlab.oauth
 
-import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.onlab.oauth.databinding.ActivityMainBinding
 import java.io.File
@@ -11,10 +11,13 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 
 
+
+
+@RequiresApi(Build.VERSION_CODES.M)
 class MainActivity : AppCompatActivity() {
 
-
     private val TAG = "MainActivity"
+    private val secrets = Secrets()
     private lateinit var binding: ActivityMainBinding
 
 
@@ -48,6 +51,8 @@ class MainActivity : AppCompatActivity() {
                 content = this.binding.etPlain.text.toString()
             )
             Log.d(TAG, "created file")
+            this.binding.etPlain.text.clear()
+            this.binding.etSave.text.clear()
             this.update_files_list()
         }
     }
@@ -64,7 +69,9 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG, "could not load file")
                 return@setOnClickListener
             }
+            Log.d(TAG, "loaded file")
             this.binding.etPlain.setText(content)
+            this.binding.etLoad.text.clear()
         }
     }
 
@@ -75,22 +82,21 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG, "must specify file name (delete)")
                 return@setOnClickListener
             }
-            if (this.delete_file(file_name = this.binding.etLoad.text.toString())) {
-                Log.d(TAG, "deleted file")
-                this.update_files_list()
-            } else {
+            if (!this.delete_file(file_name = this.binding.etLoad.text.toString())) {
                 Log.d(TAG, "could not delete file")
+                return@setOnClickListener
             }
+
+            Log.d(TAG, "deleted file")
+            this.binding.etLoad.text.clear()
+            this.update_files_list()
         }
     }
 
 
-
     private fun write_file(file_name: String, content: String) {
         val file = File(this.filesDir, file_name)
-        val outputStream = FileOutputStream(file)
-        outputStream.write(content.toByteArray())
-        outputStream.close()
+        this.secrets.write_file(file_name, content.encodeToByteArray(), FileOutputStream(file))
     }
 
 
@@ -99,10 +105,7 @@ class MainActivity : AppCompatActivity() {
         if (!file.exists()) {
             return ""
         }
-        val inputStream = FileInputStream(file)
-        val fileContents = inputStream.bufferedReader().use { it.readText() }
-        inputStream.close()
-        return fileContents
+        return this.secrets.read_file(file_name, FileInputStream(file)).decodeToString()
     }
 
 
@@ -112,6 +115,7 @@ class MainActivity : AppCompatActivity() {
             return false
         }
         file.delete()
+        this.secrets.delete_key(file_name)
         return true
     }
 
@@ -134,14 +138,6 @@ class MainActivity : AppCompatActivity() {
             this.binding.tvFilesList.text = files.joinToString(separator = "\n")
         }
     }
-
-
-
-
-
-
-
-
 
 
 }
