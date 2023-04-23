@@ -2,6 +2,7 @@ package com.onlab.oauth
 
 import android.os.Build
 import android.os.Bundle
+import android.security.keystore.UserNotAuthenticatedException
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
@@ -16,9 +17,14 @@ import java.io.FileOutputStream
 @RequiresApi(Build.VERSION_CODES.R)
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        const val AUTH_REMEMBER_SECONDS = 10
+    }
+
     private val TAG = "MainActivity"
-    private val secrets = Secrets()
+    private val secrets = Secrets(AUTH_REMEMBER_SECONDS)
     private lateinit var binding: ActivityMainBinding
+    private lateinit var localAuth: LocalAuth
 
 
 
@@ -26,14 +32,15 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         this.binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(this.binding.root)
+
+        this.localAuth = LocalAuth(this)
 
         this.update_files_list()
-        set_save_click_listener()
-        set_load_click_listener()
-        set_delete_click_listener()
-        set_local_auth_click_listener()
-
-        setContentView(this.binding.root)
+        this.set_save_click_listener()
+        this.set_load_click_listener()
+        this.set_delete_click_listener()
+        this.set_local_auth_click_listener()
     }
 
 
@@ -47,10 +54,16 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG, "must specify file name (save)")
                 return@setOnClickListener
             }
-            this.write_file(
+
+            val result = this.write_file(
                 file_name = this.binding.etSave.text.toString(),
                 content = this.binding.etPlain.text.toString()
             )
+            if (!result) {
+                Log.d(TAG, "could not write file")
+                return@setOnClickListener
+            }
+
             Log.d(TAG, "created file")
             this.binding.etPlain.text.clear()
             this.binding.etSave.text.clear()
@@ -65,11 +78,13 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG, "must specify file name (load)")
                 return@setOnClickListener
             }
+
             val content = load_file(file_name = this.binding.etLoad.text.toString())
             if (content.isEmpty()) {
                 Log.d(TAG, "could not load file")
                 return@setOnClickListener
             }
+
             Log.d(TAG, "loaded file")
             this.binding.etPlain.setText(content)
             this.binding.etLoad.text.clear()
@@ -98,14 +113,21 @@ class MainActivity : AppCompatActivity() {
     private fun set_local_auth_click_listener() {
         this.binding.btnLocalAuth.setOnClickListener {
             Log.d(TAG, "auth btn clicked")
-            LocalAuth(this).showAuthWindow()
+            this.localAuth.showAuthWindow()
         }
     }
 
 
-    private fun write_file(file_name: String, content: String) {
+    private fun write_file(file_name: String, content: String): Boolean {
         val file = File(this.filesDir, file_name)
-        this.secrets.write_file(file_name, content.encodeToByteArray(), FileOutputStream(file))
+        try {
+            this.secrets.write_file(file_name, content.encodeToByteArray(), FileOutputStream(file))
+            return true
+        } catch (ex: UserNotAuthenticatedException) {
+            Log.d(TAG, "User must authenticate. The key's validity timed out.")
+            this.localAuth.showAuthWindow()
+            return false
+        }
     }
 
 
@@ -114,7 +136,14 @@ class MainActivity : AppCompatActivity() {
         if (!file.exists()) {
             return ""
         }
-        return this.secrets.read_file(file_name, FileInputStream(file)).decodeToString()
+
+        try {
+            return this.secrets.read_file(file_name, FileInputStream(file)).decodeToString()
+        } catch (ex: UserNotAuthenticatedException) {
+            Log.d(TAG, "User must authenticate. The key's validity timed out.")
+            this.localAuth.showAuthWindow()
+            return ""
+        }
     }
 
 
@@ -123,6 +152,12 @@ class MainActivity : AppCompatActivity() {
         if (!file.exists()) {
             return false
         }
+        if (!this.localAuth.isAuthenticationStillValid(AUTH_REMEMBER_SECONDS)) {
+            Log.d(TAG, "User must authenticate. The key's validity timed out.")
+            this.localAuth.showAuthWindow()
+            return false
+        }
+
         file.delete()
         this.secrets.delete_key(file_name)
         return true

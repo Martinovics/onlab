@@ -19,7 +19,7 @@ import javax.crypto.spec.IvParameterSpec
 
 
 @RequiresApi(Build.VERSION_CODES.R)
-class Secrets {
+class Secrets(private val authRememberSeconds: Int) {
 
     private companion object {
         private const val TAG = "Secrets"
@@ -27,8 +27,6 @@ class Secrets {
         private const val BLOCK_MODE = KeyProperties.BLOCK_MODE_CBC
         private const val PADDING = KeyProperties.ENCRYPTION_PADDING_PKCS7
         private const val TRANSFORMATION = "$ALGORITHM/$BLOCK_MODE/$PADDING"
-
-        private const val REMEMBER_AUTH_SECONDS = 5 * 60
     }
 
     private val key_store = KeyStore.getInstance("AndroidKeyStore").apply {
@@ -43,7 +41,7 @@ class Secrets {
             .setEncryptionPaddings(PADDING)
             .setRandomizedEncryptionRequired(true)
             .setUserAuthenticationRequired(true)
-            .setUserAuthenticationParameters(REMEMBER_AUTH_SECONDS, KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL)
+            .setUserAuthenticationParameters(authRememberSeconds, KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL)
             //.setUserPresenceRequired(false)
         keyGenerator.init(builder.build())
         return keyGenerator.generateKey()

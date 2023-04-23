@@ -6,6 +6,7 @@ import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -29,6 +30,7 @@ class BiometricCallback(private val localAuth: LocalAuth) : BiometricPrompt.Auth
 
     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
         super.onAuthenticationSucceeded(result)
+        this.localAuth.updateAuthenticationTimestamp()
         Toast.makeText(this.ctx, "Authentication succeeded!", Toast.LENGTH_SHORT).show()
     }
 
@@ -47,13 +49,11 @@ class BiometricCallback(private val localAuth: LocalAuth) : BiometricPrompt.Auth
 
 
 @RequiresApi(Build.VERSION_CODES.P)
-class LocalAuth(private val ctx: FragmentActivity) {
-
-    companion object {
-        const val REMEMBER_AUTH = 5 * 60
-    }
+class LocalAuth(private val ctx: MainActivity) {
 
     private val TAG = "LocalAuth"
+    private val keyguardManager = getSystemService(this.ctx, KeyguardManager::class.java)
+    private var authenticationTimestamp = 0
 
     private val executor = ContextCompat.getMainExecutor(this.ctx)
     private val biometricPrompt = BiometricPrompt(this.ctx, executor, BiometricCallback(this))
@@ -73,6 +73,19 @@ class LocalAuth(private val ctx: FragmentActivity) {
     }
 
 
+    private fun getTimestampSeconds(): Int {
+        return (System.currentTimeMillis() / 1000).toInt()
+    }
+
+    fun isAuthenticationStillValid(timeout: Int): Boolean {
+        return this.getTimestampSeconds() - this.authenticationTimestamp < timeout
+    }
+
+    fun updateAuthenticationTimestamp() {
+        this.authenticationTimestamp = this.getTimestampSeconds()
+    }
+
+
     private fun callBiometricPrompt() {  // fingerprint, iris, or face...
         this.biometricPrompt.authenticate(this.biometricPromptInfo)
     }
@@ -81,7 +94,7 @@ class LocalAuth(private val ctx: FragmentActivity) {
         this.biometricPrompt.authenticate(this.deviceCredentialPromptInfo)
     }
 
-    fun callCancelPrompt() {  // PIN, pattern, or password...
+    private fun callCancelPrompt() {  // PIN, pattern, or password...
         this.biometricPrompt.cancelAuthentication()
     }
 
@@ -96,7 +109,6 @@ class LocalAuth(private val ctx: FragmentActivity) {
             else -> {
                 Log.d(TAG, "Cant authenticate using biometrics. Checking other credentials.")
 
-                val keyguardManager = getSystemService(this.ctx, KeyguardManager::class.java)
                 if (keyguardManager?.isKeyguardSecure == true) {
                     Log.d(TAG, "App can authenticate using credentials.")
                     this.callCredentialPrompt()
