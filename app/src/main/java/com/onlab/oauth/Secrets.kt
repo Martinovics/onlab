@@ -14,13 +14,11 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.IvParameterSpec
 
 
-// main source: https://github.com/philipplackner/AndroidCrypto/blob/encrypt/decrypt/app/src/main/java/com/plcoding/androidcrypto/CryptoManager.kt
 
 
 
 
-
-@RequiresApi(Build.VERSION_CODES.M)
+@RequiresApi(Build.VERSION_CODES.R)
 class Secrets {
 
     private companion object {
@@ -29,6 +27,8 @@ class Secrets {
         private const val BLOCK_MODE = KeyProperties.BLOCK_MODE_CBC
         private const val PADDING = KeyProperties.ENCRYPTION_PADDING_PKCS7
         private const val TRANSFORMATION = "$ALGORITHM/$BLOCK_MODE/$PADDING"
+
+        private const val REMEMBER_AUTH_SECONDS = 5 * 60
     }
 
     private val key_store = KeyStore.getInstance("AndroidKeyStore").apply {
@@ -41,8 +41,10 @@ class Secrets {
         val builder = KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(BLOCK_MODE)
             .setEncryptionPaddings(PADDING)
-            .setUserAuthenticationRequired(false)
             .setRandomizedEncryptionRequired(true)
+            .setUserAuthenticationRequired(true)
+            .setUserAuthenticationParameters(REMEMBER_AUTH_SECONDS, KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL)
+            //.setUserPresenceRequired(false)
         keyGenerator.init(builder.build())
         return keyGenerator.generateKey()
     }

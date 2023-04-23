@@ -13,7 +13,7 @@ import java.io.FileOutputStream
 
 
 
-@RequiresApi(Build.VERSION_CODES.M)
+@RequiresApi(Build.VERSION_CODES.R)
 class MainActivity : AppCompatActivity() {
 
     private val TAG = "MainActivity"
@@ -31,6 +31,7 @@ class MainActivity : AppCompatActivity() {
         set_save_click_listener()
         set_load_click_listener()
         set_delete_click_listener()
+        set_local_auth_click_listener()
 
         setContentView(this.binding.root)
     }
@@ -90,6 +91,14 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "deleted file")
             this.binding.etLoad.text.clear()
             this.update_files_list()
+        }
+    }
+
+
+    private fun set_local_auth_click_listener() {
+        this.binding.btnLocalAuth.setOnClickListener {
+            Log.d(TAG, "auth btn clicked")
+            LocalAuth(this).showAuthWindow()
         }
     }
 
