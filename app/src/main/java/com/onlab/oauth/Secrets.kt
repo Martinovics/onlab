@@ -42,7 +42,6 @@ class Secrets(private val authRememberSeconds: Int) {
             .setRandomizedEncryptionRequired(true)
             .setUserAuthenticationRequired(true)
             .setUserAuthenticationParameters(authRememberSeconds, KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL)
-            //.setUserPresenceRequired(false)
         keyGenerator.init(builder.build())
         return keyGenerator.generateKey()
     }
