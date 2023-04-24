@@ -36,15 +36,15 @@ class MainActivity : AppCompatActivity() {
 
         this.localAuth = LocalAuth(this)
 
-        this.update_files_list()
-        this.set_save_click_listener()
-        this.set_load_click_listener()
-        this.set_delete_click_listener()
-        this.set_local_auth_click_listener()
+        this.updateFilesList()
+        this.setSaveClickListener()
+        this.setLoadClickListener()
+        this.setDeleteClickListener()
+        this.setLocalAuthClickListener()
     }
 
 
-    private fun set_save_click_listener() {
+    private fun setSaveClickListener() {
         this.binding.btnSave.setOnClickListener {
             if (this.binding.etPlain.text.isEmpty()) {
                 Log.d(TAG, "cant save empty file")
@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val result = this.write_file(
+            val result = this.writeFile(
                 file_name = this.binding.etSave.text.toString(),
                 content = this.binding.etPlain.text.toString()
             )
@@ -67,19 +67,19 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "created file")
             this.binding.etPlain.text.clear()
             this.binding.etSave.text.clear()
-            this.update_files_list()
+            this.updateFilesList()
         }
     }
 
 
-    private fun set_load_click_listener() {
+    private fun setLoadClickListener() {
         this.binding.btnLoad.setOnClickListener {
             if (this.binding.etLoad.text.isEmpty()) {
                 Log.d(TAG, "must specify file name (load)")
                 return@setOnClickListener
             }
 
-            val content = load_file(file_name = this.binding.etLoad.text.toString())
+            val content = loadFile(file_name = this.binding.etLoad.text.toString())
             if (content.isEmpty()) {
                 Log.d(TAG, "could not load file")
                 return@setOnClickListener
@@ -92,25 +92,25 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun set_delete_click_listener() {
+    private fun setDeleteClickListener() {
         this.binding.btnDelete.setOnClickListener {
             if (this.binding.etLoad.text.isEmpty()) {
                 Log.d(TAG, "must specify file name (delete)")
                 return@setOnClickListener
             }
-            if (!this.delete_file(file_name = this.binding.etLoad.text.toString())) {
+            if (!this.deleteFileLocal(file_name = this.binding.etLoad.text.toString())) {
                 Log.d(TAG, "could not delete file")
                 return@setOnClickListener
             }
 
             Log.d(TAG, "deleted file")
             this.binding.etLoad.text.clear()
-            this.update_files_list()
+            this.updateFilesList()
         }
     }
 
 
-    private fun set_local_auth_click_listener() {
+    private fun setLocalAuthClickListener() {
         this.binding.btnLocalAuth.setOnClickListener {
             Log.d(TAG, "auth btn clicked")
             this.localAuth.showAuthWindow()
@@ -118,10 +118,10 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun write_file(file_name: String, content: String): Boolean {
+    private fun writeFile(file_name: String, content: String): Boolean {
         val file = File(this.filesDir, file_name)
         try {
-            this.secrets.write_file(file_name, content.encodeToByteArray(), FileOutputStream(file))
+            this.secrets.writeFile(file_name, content.encodeToByteArray(), FileOutputStream(file))
             return true
         } catch (ex: UserNotAuthenticatedException) {
             Log.d(TAG, "User must authenticate. The key's validity timed out.")
@@ -131,14 +131,14 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun load_file(file_name: String): String {
+    private fun loadFile(file_name: String): String {
         val file = File(this.filesDir, file_name)
         if (!file.exists()) {
             return ""
         }
 
         try {
-            return this.secrets.read_file(file_name, FileInputStream(file)).decodeToString()
+            return this.secrets.readFile(file_name, FileInputStream(file)).decodeToString()
         } catch (ex: UserNotAuthenticatedException) {
             Log.d(TAG, "User must authenticate. The key's validity timed out.")
             this.localAuth.showAuthWindow()
@@ -147,7 +147,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun delete_file(file_name: String): Boolean {
+    private fun deleteFileLocal(file_name: String): Boolean {
         val file = File(this.filesDir, file_name)
         if (!file.exists()) {
             return false
@@ -159,12 +159,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         file.delete()
-        this.secrets.delete_key(file_name)
+        this.secrets.deleteKey(file_name)
         return true
     }
 
 
-    private fun get_files_list(): List<String> {
+    private fun getFilesList(): List<String> {
         val fileNames = mutableListOf<String>()
         val files = this.filesDir.listFiles()
         files?.forEach { file ->
@@ -174,8 +174,8 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun update_files_list() {
-        val files = get_files_list()
+    private fun updateFilesList() {
+        val files = getFilesList()
         if (files.isEmpty()) {
             this.binding.tvFilesList.text = ""
         } else {

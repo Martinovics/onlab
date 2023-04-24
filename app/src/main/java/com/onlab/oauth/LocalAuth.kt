@@ -1,12 +1,11 @@
 package com.onlab.oauth
 
 import android.app.KeyguardManager
-import android.nfc.Tag
+import android.content.Context
 import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
-import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -23,7 +22,7 @@ import androidx.fragment.app.FragmentActivity
 
 
 @RequiresApi(Build.VERSION_CODES.P)
-class BiometricCallback(private val localAuth: LocalAuth) : BiometricPrompt.AuthenticationCallback() {
+class LocalAuthCallback(private val localAuth: LocalAuth) : BiometricPrompt.AuthenticationCallback() {
 
     private val ctx = localAuth.getContext()
 
@@ -56,10 +55,10 @@ class LocalAuth(private val ctx: MainActivity) {
     private var authenticationTimestamp = 0
 
     private val executor = ContextCompat.getMainExecutor(this.ctx)
-    private val biometricPrompt = BiometricPrompt(this.ctx, executor, BiometricCallback(this))
+    private val biometricPrompt = BiometricPrompt(this.ctx, executor, LocalAuthCallback(this))
     private val biometricPromptInfo = BiometricPrompt.PromptInfo.Builder()
-        .setTitle("Biometric login for my app")
-        .setSubtitle("Log in using your biometric credential")
+        .setTitle("Biometric auth")
+        .setSubtitle("Use biometric credential")
         .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
         .build()
     private val deviceCredentialPromptInfo = BiometricPrompt.PromptInfo.Builder()
@@ -68,7 +67,7 @@ class LocalAuth(private val ctx: MainActivity) {
         .build()
 
 
-    fun getContext(): FragmentActivity {
+    fun getContext(): Context {
         return this.ctx
     }
 

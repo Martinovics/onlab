@@ -29,12 +29,12 @@ class Secrets(private val authRememberSeconds: Int) {
         private const val TRANSFORMATION = "$ALGORITHM/$BLOCK_MODE/$PADDING"
     }
 
-    private val key_store = KeyStore.getInstance("AndroidKeyStore").apply {
+    private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply {
         load(null)
     }
 
 
-    private fun generate_key(alias: String): SecretKey {
+    private fun generateKey(alias: String): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(ALGORITHM, "AndroidKeyStore")
         val builder = KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(BLOCK_MODE)
@@ -48,28 +48,28 @@ class Secrets(private val authRememberSeconds: Int) {
     }
 
 
-    private fun get_key(alias: String): SecretKey {
-        val key = this.key_store.getEntry(alias, null) as? KeyStore.SecretKeyEntry
-        return key?.secretKey ?: generate_key(alias)
+    private fun getKey(alias: String): SecretKey {
+        val key = this.keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry
+        return key?.secretKey ?: generateKey(alias)
     }
 
 
-    private fun get_encryption_cipher(alias: String): Cipher {
+    private fun getEncryptionCipher(alias: String): Cipher {
         return Cipher.getInstance(TRANSFORMATION).apply {
-            init(Cipher.ENCRYPT_MODE, get_key(alias))
+            init(Cipher.ENCRYPT_MODE, getKey(alias))
         }
     }
 
 
-    private fun get_decryption_cipher(alias: String, initialization_vector: ByteArray): Cipher {
+    private fun getDecryptionCipher(alias: String, initialization_vector: ByteArray): Cipher {
         return Cipher.getInstance(TRANSFORMATION).apply {
-            init(Cipher.DECRYPT_MODE, get_key(alias), IvParameterSpec(initialization_vector))
+            init(Cipher.DECRYPT_MODE, getKey(alias), IvParameterSpec(initialization_vector))
         }
     }
 
 
-    fun write_file(alias: String, content: ByteArray, outputStream: OutputStream): ByteArray {
-        val cipher = get_encryption_cipher(alias)
+    fun writeFile(alias: String, content: ByteArray, outputStream: OutputStream): ByteArray {
+        val cipher = getEncryptionCipher(alias)
         val encryptedBytes = cipher.doFinal(content)
         outputStream.use {
             it.write(cipher.iv.size)
@@ -81,7 +81,7 @@ class Secrets(private val authRememberSeconds: Int) {
     }
 
 
-    fun read_file(alias: String, inputStream: InputStream): ByteArray {
+    fun readFile(alias: String, inputStream: InputStream): ByteArray {
         return inputStream.use {
             val ivSize = it.read()
             val iv = ByteArray(ivSize)
@@ -91,15 +91,15 @@ class Secrets(private val authRememberSeconds: Int) {
             val encryptedBytes = ByteArray(encryptedBytesSize)
             it.read(encryptedBytes)
 
-            val cipher = get_decryption_cipher(alias, iv)
+            val cipher = getDecryptionCipher(alias, iv)
             cipher.doFinal(encryptedBytes)
         }
     }
 
 
-    fun delete_key(alias: String) {
+    fun deleteKey(alias: String) {
         try {
-            this.key_store.deleteEntry(alias)
+            this.keyStore.deleteEntry(alias)
         } catch (e: KeyStoreException) {
             Log.e(TAG, "Error deleting key: ${e.message}")
         }
