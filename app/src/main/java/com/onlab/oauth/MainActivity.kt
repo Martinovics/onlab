@@ -11,6 +11,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
+import com.google.api.services.drive.DriveScopes
 import com.onlab.oauth.databinding.ActivityMainBinding
 
 
@@ -36,6 +38,7 @@ class MainActivity : AppCompatActivity() {
 
         this.gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                    .requestEmail()
+                   .requestScopes(Scope(DriveScopes.DRIVE_FILE), Scope(DriveScopes.DRIVE))
                    .build()
         this.gsc = GoogleSignIn.getClient(this, this.gso)
 
