@@ -4,33 +4,46 @@ import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
-import com.google.android.gms.auth.api.signin.GoogleSignIn
+import android.widget.Toast
+import androidx.core.content.ContentProviderCompat.requireContext
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.Scope
 import com.google.android.gms.tasks.Task
-import com.google.api.services.drive.DriveScopes
-import com.onlab.oauth.classes.SignInHelper
+import com.onlab.oauth.adapters.ContentBrowserAdapter
+import com.onlab.oauth.classes.GoogleHelper
 import com.onlab.oauth.databinding.ActivityLoggedInBinding
+import com.onlab.oauth.interfaces.IViewItemClickedListener
+import com.onlab.oauth.services.DriveService
 
-class LoggedInActivity : AppCompatActivity() {
+class LoggedInActivity : AppCompatActivity(), IViewItemClickedListener {
 
     private var TAG = this::class.java.simpleName
     private lateinit var binding: ActivityLoggedInBinding
     private lateinit var gsc: GoogleSignInClient
+    private lateinit var adapter: ContentBrowserAdapter
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         this.binding = ActivityLoggedInBinding.inflate(layoutInflater)
 
-        this.gsc = SignInHelper.getSignInClient(this)
-        val account = SignInHelper.getLastSignedInAccount(this)!!  // sosem kéne null-nak lennie, mert csak akkor jövünk át, amikor már beléptünk
+        this.gsc = GoogleHelper.getSignInClient(this)
+        val account = GoogleHelper.getLastSignedInAccount(this)!!
 
         this.binding.tvLoggedInGreet.text = "Logged in as ${account.displayName}"
         this.binding.btnSignOut.setOnClickListener { this.signOut() }
+        this.binding.btnTest.setOnClickListener { this.testFeature() }
+
+        initRecycleView()
 
         setContentView(this.binding.root)
+    }
+
+
+    private fun initRecycleView() {
+        this.adapter = ContentBrowserAdapter(this)
+        this.binding.rvContents.adapter = this.adapter
+        this.binding.rvContents.layoutManager = LinearLayoutManager(this)
     }
 
 
@@ -56,5 +69,23 @@ class LoggedInActivity : AppCompatActivity() {
         } else {
             Log.w(TAG, "Sign-out failed")
         }
+    }
+
+
+    private fun testFeature() {
+        val drive = GoogleHelper.getDriveService(this)
+        val driveService = DriveService(drive)
+        driveService.listDir("root")
+        driveService.listDir("144TQU7FoU6m7Y2ZW1GM7ZbqRnnipupLj")
+    }
+
+
+    override fun onItemClicked(position: Int) {
+        Toast.makeText(this, "Item at $position clicked", Toast.LENGTH_LONG).show()
+    }
+
+    override fun onItemLongClicked(position: Int) {
+        Toast.makeText(this, "Item at $position long-clicked", Toast.LENGTH_LONG).show()
+
     }
 }

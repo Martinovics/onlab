@@ -10,7 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.common.api.ApiException
-import com.onlab.oauth.classes.SignInHelper
+import com.onlab.oauth.classes.GoogleHelper
 import com.onlab.oauth.databinding.ActivityMainBinding
 
 
@@ -30,14 +30,14 @@ class MainActivity : AppCompatActivity() {
         this.binding = ActivityMainBinding.inflate(layoutInflater)
         this.binding.btnSignIn.setOnClickListener { this.signIn() }
 
-        this.gsc = SignInHelper.getSignInClient(this)
+        this.gsc = GoogleHelper.getSignInClient(this)
         this.signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
                 handleSignIn(result.data)
             }
         }
 
-        if (SignInHelper.getLastSignedInAccount(this) != null) {  // már be van jelentkezve
+        if (GoogleHelper.getLastSignedInAccount(this) != null) {  // már be van jelentkezve
             switchToLoggedInActivity()
         }
 
