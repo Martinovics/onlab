@@ -1,11 +1,15 @@
 package com.onlab.oauth
 
 import android.content.Intent
+import android.nfc.Tag
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Toast
 import androidx.core.content.ContentProviderCompat.requireContext
+import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.tasks.Task
@@ -37,6 +41,26 @@ class LoggedInActivity : AppCompatActivity(), IViewItemClickedListener {
         initRecycleView()
 
         setContentView(this.binding.root)
+
+        setSupportActionBar(binding.toolbar.root)
+        supportActionBar?.title = ""
+
+        this.binding.toolbar.btnToolbarHamburgerMenu.setOnClickListener {
+            this.binding.drawerLayout.openDrawer(GravityCompat.START)
+        }
+
+        initNavigationView()
+
+    }
+
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (this.binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            this.binding.drawerLayout.closeDrawer(GravityCompat.START)
+        } else {
+            onBackPressedDispatcher.onBackPressed()
+        }
     }
 
 
@@ -44,6 +68,30 @@ class LoggedInActivity : AppCompatActivity(), IViewItemClickedListener {
         this.adapter = ContentBrowserAdapter(this)
         this.binding.rvContents.adapter = this.adapter
         this.binding.rvContents.layoutManager = LinearLayoutManager(this)
+    }
+
+
+    private fun initNavigationView() {
+        this.binding.drawerMenu.setNavigationItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.drawerMenuGoogleDrive -> {
+                    Log.d(TAG, "drive clicked")
+                    true
+                }
+                R.id.drawerMenuOneDrive -> {
+                    Log.d(TAG, "onedrive clicked")
+                    true
+                }
+                R.id.drawerMenuDropBox -> {
+                    Log.d(TAG, "dropbox clicked")
+                    true
+                }
+                // ... és így tovább az összes menüelemhez
+                else -> {
+                    false
+                }
+            }
+        }
     }
 
 
