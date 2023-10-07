@@ -15,10 +15,7 @@
         android:theme="@style/Theme.OAuth"
         tools:targetApi="31">
         <activity
-            android:name=".LoggedInActivity"
-            android:exported="false" />
-        <activity
-            android:name=".MainActivity"
+            android:name=".viewModels.Activities.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

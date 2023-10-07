@@ -1,42 +1,33 @@
-package com.onlab.oauth
+package com.onlab.oauth.viewModels.Activities
 
-import android.content.Intent
-import android.nfc.Tag
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
-import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
-import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.tasks.Task
+import com.google.api.services.drive.Drive
+import com.onlab.oauth.R
 import com.onlab.oauth.adapters.ContentBrowserAdapter
-import com.onlab.oauth.classes.GoogleHelper
-import com.onlab.oauth.databinding.ActivityLoggedInBinding
+import com.onlab.oauth.databinding.ActivityMainBinding
 import com.onlab.oauth.interfaces.IConnectionService
 import com.onlab.oauth.interfaces.IViewItemClickedListener
 import com.onlab.oauth.services.DriveService
 import com.onlab.oauth.services.GoogleConnectionService
-import java.util.Dictionary
 
-class LoggedInActivity : AppCompatActivity(), IViewItemClickedListener {
+class MainActivity : AppCompatActivity(), IViewItemClickedListener {
 
     private var TAG = this::class.java.simpleName
-    private lateinit var binding: ActivityLoggedInBinding
+    private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: ContentBrowserAdapter
     private lateinit var googleConnectionService: IConnectionService
-    private lateinit var loggedIn: Dictionary<String, Boolean>
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         this.googleConnectionService = GoogleConnectionService(this)
-        this.binding = ActivityLoggedInBinding.inflate(layoutInflater)
-
-        this.binding.btnTest.setOnClickListener { this.testFeature() }
+        this.binding = ActivityMainBinding.inflate(layoutInflater)
 
         initRecycleView()
 
@@ -50,7 +41,6 @@ class LoggedInActivity : AppCompatActivity(), IViewItemClickedListener {
         }
 
         initNavigationView()
-
     }
 
 
@@ -125,14 +115,6 @@ class LoggedInActivity : AppCompatActivity(), IViewItemClickedListener {
         menuItem.title = "Connect to Google Drive"
         Toast.makeText(this, "Disconnected from Google Drive", Toast.LENGTH_SHORT).show()
     }
-
-    private fun testFeature() {
-        val drive = GoogleHelper.getDriveService(this)
-        val driveService = DriveService(drive)
-        driveService.listDir("root")
-        driveService.listDir("144TQU7FoU6m7Y2ZW1GM7ZbqRnnipupLj")
-    }
-
 
     override fun onItemClicked(position: Int) {
         Toast.makeText(this, "Item at $position clicked", Toast.LENGTH_LONG).show()

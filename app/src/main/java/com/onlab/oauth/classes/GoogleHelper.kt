@@ -1,7 +1,6 @@
 package com.onlab.oauth.classes
 
 import android.app.Activity
-import android.content.Context
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
@@ -12,10 +11,9 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
-import com.onlab.oauth.R
 
 
-object GoogleHelper {
+class GoogleHelper(private val activity: Activity) {
 
     private var gso: GoogleSignInOptions =
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -28,36 +26,33 @@ object GoogleHelper {
             return gso
         }
 
-
-    fun getSignInClient(activity: Activity): GoogleSignInClient {
-        return GoogleSignIn.getClient(activity, this.signInOptions)
+    fun getSignInClient(): GoogleSignInClient {
+        return GoogleSignIn.getClient(this.activity, this.signInOptions)
     }
 
-    fun getLastSignedInAccount(context: Context): GoogleSignInAccount? {
-        return GoogleSignIn.getLastSignedInAccount(context)
+    fun getLastSignedInAccount(): GoogleSignInAccount? {
+        return GoogleSignIn.getLastSignedInAccount(this.activity)
     }
 
-    fun isLoggedIn(context: Context): Boolean {
-        return this.getLastSignedInAccount(context) != null
+    fun isLoggedIn(): Boolean {
+        return this.getLastSignedInAccount() != null
     }
 
-    fun getDriveService(context: Context): Drive {
-        val account = this.getLastSignedInAccount(context)
-                      ?: throw java.lang.Exception("Account was null. Sign in first.")
+    fun getDriveService(): Drive {
+        val account = this.getLastSignedInAccount()
+            ?: throw java.lang.Exception("Account was null. Sign in first.")
 
         val credential = GoogleAccountCredential.usingOAuth2(
-            context, listOf(DriveScopes.DRIVE_FILE)
+            this.activity, listOf(DriveScopes.DRIVE_FILE)
         )
         credential.selectedAccount = account.account!!
 
         return Drive.Builder(
-            //AndroidHttp.newCompatibleTransport(),
             NetHttpTransport(),
-            //JacksonFactory.getDefaultInstance(),
             GsonFactory.getDefaultInstance(),
             credential
         )
-        .setApplicationName("Szakdolgozat")
-        .build()
+            .setApplicationName("Szakdolgozat")
+            .build()
     }
 }

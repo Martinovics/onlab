@@ -8,14 +8,14 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.tasks.Task
-import com.onlab.oauth.classes.GoogleHelper2
+import com.onlab.oauth.classes.GoogleHelper
 import com.onlab.oauth.interfaces.IConnectionService
 
 
 class GoogleConnectionService(private val activity: AppCompatActivity) : IConnectionService {
 
     private val Tag = "GoogleConnectionService"
-    private val helper: GoogleHelper2 = GoogleHelper2(activity)
+    private val helper: GoogleHelper = GoogleHelper(activity)
     private val gsc = helper.getSignInClient()
 
     private var loginCallbackSuccess: (() -> Unit)? = null
@@ -62,5 +62,9 @@ class GoogleConnectionService(private val activity: AppCompatActivity) : IConnec
             Log.w(Tag, "Sign-out from google failed")
             callback_fail?.invoke()
         }
+    }
+
+    override fun getCloudStorage(): Any {
+        return helper.getDriveService()
     }
 }
