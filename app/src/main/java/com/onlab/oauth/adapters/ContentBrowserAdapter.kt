@@ -13,10 +13,10 @@ class ContentBrowserAdapter(private val onClickListener: IViewItemClickedListene
     inner class ItemViewHolder(val binding: ContentBrowserItemBinding) : RecyclerView.ViewHolder(binding.root)
 
     private var items = mutableListOf<ICloudStorageContent>(
-        GoogleDriveContent("name1", "id1", "folder"),
-        GoogleDriveContent("name2", "id2", "folder"),
-        GoogleDriveContent("name3", "id3", "file"),
-        GoogleDriveContent("name4", "id4", "file"),
+//        GoogleDriveContent("name1", "id1", "folder"),
+//        GoogleDriveContent("name2", "id2", "folder"),
+//        GoogleDriveContent("name3", "id3", "file"),
+//        GoogleDriveContent("name4", "id4", "file"),
     )
 
 
@@ -49,7 +49,7 @@ class ContentBrowserAdapter(private val onClickListener: IViewItemClickedListene
     fun addRange(items: List<ICloudStorageContent>): Unit {
         val positionFrom = this.itemCount - 1
         this.items.addAll(items)
-        notifyItemRangeInserted(positionFrom, this.itemCount)
+        notifyItemRangeInserted(positionFrom, this.itemCount - 1)
     }
 
 
@@ -58,5 +58,13 @@ class ContentBrowserAdapter(private val onClickListener: IViewItemClickedListene
         notifyItemRemoved(position)
     }
 
+    fun clear() {
+        val size = this.items.size
+        this.items.clear()
+        notifyItemRangeRemoved(0, size)
+    }
 
+    fun getItemAt(position: Int): ICloudStorageContent {
+        return this.items[position]
+    }
 }

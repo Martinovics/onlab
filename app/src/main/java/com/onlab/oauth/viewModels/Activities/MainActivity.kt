@@ -10,11 +10,17 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.api.services.drive.Drive
 import com.onlab.oauth.R
 import com.onlab.oauth.adapters.ContentBrowserAdapter
+import com.onlab.oauth.classes.StorageRepository
 import com.onlab.oauth.databinding.ActivityMainBinding
+import com.onlab.oauth.enums.StorageSource
+import com.onlab.oauth.interfaces.ICloudStorage
 import com.onlab.oauth.interfaces.IConnectionService
 import com.onlab.oauth.interfaces.IViewItemClickedListener
 import com.onlab.oauth.services.DriveService
 import com.onlab.oauth.services.GoogleConnectionService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity(), IViewItemClickedListener {
 
@@ -26,21 +32,21 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        this.googleConnectionService = GoogleConnectionService(this)
         this.binding = ActivityMainBinding.inflate(layoutInflater)
 
-        initRecycleView()
+        this.googleConnectionService = GoogleConnectionService(this)
+
 
         setContentView(this.binding.root)
-
         setSupportActionBar(binding.toolbar.root)
         supportActionBar?.title = ""
-
         this.binding.toolbar.btnToolbarHamburgerMenu.setOnClickListener {
             this.binding.drawerLayout.openDrawer(GravityCompat.START)
         }
 
+        initRecycleView()
         initNavigationView()
+        initStorages()
     }
 
 
@@ -53,6 +59,25 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
         }
     }
 
+    private fun initStorages() {
+        if (this.googleConnectionService.isLoggedIn()) {
+            val storage = StorageRepository.registerStorage(
+                StorageSource.GOOGLE_DRIVE.toString(),
+                DriveService(googleConnectionService.getCloudStorage() as Drive)
+            )
+            listDir(storage, "root")
+        }
+    }
+
+    private fun listDir(storage: ICloudStorage, directoryID: String) {
+        CoroutineScope(Dispatchers.Main).launch {
+            val contents = storage.listDir(directoryID)
+//            for (content in contents) {
+//                this@MainActivity.adapter.add(content)  // addrange does not work -> inconsistency error
+//            }
+            this@MainActivity.adapter.addRange(contents)
+        }
+    }
 
     private fun initRecycleView() {
         this.adapter = ContentBrowserAdapter(this)
@@ -109,6 +134,10 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
     private fun googleConnectedCallback(menuItem: MenuItem) {
         menuItem.title = "Disconnect from Google Drive"
         Toast.makeText(this, "Connected to Google Drive", Toast.LENGTH_SHORT).show()
+
+        StorageRepository.registerStorage(
+            "GoogleDrive", DriveService(googleConnectionService.getCloudStorage() as Drive)
+        )
     }
 
     private fun googleDisconnectedCallback(menuItem: MenuItem) {
@@ -117,7 +146,11 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
     }
 
     override fun onItemClicked(position: Int) {
-        Toast.makeText(this, "Item at $position clicked", Toast.LENGTH_LONG).show()
+        Log.d(TAG, position.toString())
+        val item = this.adapter.getItemAt(position)
+        Log.d(TAG, item.name)
+        this.adapter.clear()
+        listDir(StorageRepository.getStorage(item.source.toString())!!, item.id)
     }
 
     override fun onItemLongClicked(position: Int) {

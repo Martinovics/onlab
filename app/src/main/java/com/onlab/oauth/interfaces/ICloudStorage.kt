@@ -2,5 +2,5 @@ package com.onlab.oauth.interfaces
 
 
 interface ICloudStorage {
-    fun listDir(directoryID: String): Unit
+    suspend fun listDir(directoryID: String): List<ICloudStorageContent>
 }

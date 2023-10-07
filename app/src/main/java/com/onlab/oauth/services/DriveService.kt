@@ -18,21 +18,16 @@ class DriveService(private val drive: Drive) : ICloudStorage {
         private const val TAG: String = "DriveService"
     }
 
-    override fun listDir(directoryID: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+    override suspend fun listDir(directoryID: String): List<ICloudStorageContent> {
+        return withContext(Dispatchers.IO) {
+            val contents = mutableListOf<ICloudStorageContent>()
             val files = fetchDirectoryById(directoryID)
-
-            // Váltás a Main szálra a UI módosításokhoz (jelen esetben a logoláshoz nem kell | csak példa)
-            withContext(Dispatchers.Main) {
-                if (files.isNotEmpty()) {
-                    for (file in files) {
-                        val content: ICloudStorageContent = GoogleDriveContent(file.name, file.id, file.mimeType)
-                        Log.d(TAG, "Name: ${content.name} | ID: ${content.id} | Mime: ${content.type} | Source: ${content.source}")
-                    }
-                } else {
-                    Log.i(TAG, "No files found.")
-                }
+            for (file in files) {
+                val content: ICloudStorageContent = GoogleDriveContent(file.name, file.id, file.mimeType)
+                contents.add(content)
+                Log.d(TAG, "Name: ${content.name} | ID: ${content.id} | Mime: ${content.type} | Source: ${content.source}")
             }
+            contents
         }
     }
 
