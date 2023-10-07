@@ -16,26 +16,26 @@ import com.google.android.gms.tasks.Task
 import com.onlab.oauth.adapters.ContentBrowserAdapter
 import com.onlab.oauth.classes.GoogleHelper
 import com.onlab.oauth.databinding.ActivityLoggedInBinding
+import com.onlab.oauth.interfaces.IConnectionService
 import com.onlab.oauth.interfaces.IViewItemClickedListener
 import com.onlab.oauth.services.DriveService
+import com.onlab.oauth.services.GoogleConnectionService
+import java.util.Dictionary
 
 class LoggedInActivity : AppCompatActivity(), IViewItemClickedListener {
 
     private var TAG = this::class.java.simpleName
     private lateinit var binding: ActivityLoggedInBinding
-    private lateinit var gsc: GoogleSignInClient
     private lateinit var adapter: ContentBrowserAdapter
+    private lateinit var googleConnectionService: IConnectionService
+    private lateinit var loggedIn: Dictionary<String, Boolean>
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        this.googleConnectionService = GoogleConnectionService(this)
         this.binding = ActivityLoggedInBinding.inflate(layoutInflater)
 
-        this.gsc = GoogleHelper.getSignInClient(this)
-        val account = GoogleHelper.getLastSignedInAccount(this)!!
-
-        this.binding.tvLoggedInGreet.text = "Logged in as ${account.displayName}"
-        this.binding.btnSignOut.setOnClickListener { this.signOut() }
         this.binding.btnTest.setOnClickListener { this.testFeature() }
 
         initRecycleView()
@@ -72,53 +72,59 @@ class LoggedInActivity : AppCompatActivity(), IViewItemClickedListener {
 
 
     private fun initNavigationView() {
+
+        // check google connection | set texts
+        val drawerMenuItem = this.binding.drawerMenu.menu.findItem(R.id.drawerMenuGoogleDrive)
+        if (this.googleConnectionService.isLoggedIn()) {
+            drawerMenuItem.title = "Disconnect Google Drive"
+        } else {
+            drawerMenuItem.title = "Connect Google Drive"
+        }
+
+        // check OneDrive connection
+
+        // check Dropbox connection
+
         this.binding.drawerMenu.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.drawerMenuGoogleDrive -> {
-                    Log.d(TAG, "drive clicked")
+                    Log.d(TAG, "${menuItem.title} clicked")
+                    if (googleConnectionService.isLoggedIn()) {
+                        this.googleConnectionService.signOut(
+                            callback_success = { googleDisconnectedCallback(menuItem) },
+                            callback_fail = { Toast.makeText(this, "Disconnect failed", Toast.LENGTH_SHORT).show() })
+                    } else {
+                        this.googleConnectionService.signIn(
+                            callback_success = { googleConnectedCallback(menuItem) },
+                            callback_fail = { Toast.makeText(this, "Connect failed", Toast.LENGTH_SHORT).show() })
+                    }
                     true
                 }
                 R.id.drawerMenuOneDrive -> {
-                    Log.d(TAG, "onedrive clicked")
+                    Log.d(TAG, "${menuItem.title} clicked")
                     true
                 }
                 R.id.drawerMenuDropBox -> {
-                    Log.d(TAG, "dropbox clicked")
+                    Log.d(TAG, "${menuItem.title} clicked")
                     true
                 }
-                // ... és így tovább az összes menüelemhez
                 else -> {
+                    Log.d(TAG, "Unknown drawer item clicked")
                     false
                 }
             }
         }
     }
 
-
-    private fun switchToMainActivity() {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        startActivity(intent)
+    private fun googleConnectedCallback(menuItem: MenuItem) {
+        menuItem.title = "Disconnect from Google Drive"
+        Toast.makeText(this, "Connected to Google Drive", Toast.LENGTH_SHORT).show()
     }
 
-
-    private fun signOut() {
-        this.gsc.signOut().addOnCompleteListener(this) { task ->
-            this.handleSignOut(task)
-        }
+    private fun googleDisconnectedCallback(menuItem: MenuItem) {
+        menuItem.title = "Connect to Google Drive"
+        Toast.makeText(this, "Disconnected from Google Drive", Toast.LENGTH_SHORT).show()
     }
-
-
-    private fun handleSignOut(task: Task<Void>) {
-        if (task.isSuccessful) {  // a sign-out sikeres volt
-            Log.d(TAG, "Sign-out succeeded")
-            this.switchToMainActivity()
-        } else {
-            Log.w(TAG, "Sign-out failed")
-        }
-    }
-
 
     private fun testFeature() {
         val drive = GoogleHelper.getDriveService(this)
