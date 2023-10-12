@@ -14,4 +14,12 @@
         android:src="@drawable/hamburger_icon"
         android:background="#2596be" />
 
+    <TextView
+        android:id="@+id/tvToolbarCurrentFolder"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="25dp"
+        android:text="Root"
+        android:textSize="16sp" />
+
 </androidx.appcompat.widget.Toolbar>

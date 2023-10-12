@@ -12,10 +12,13 @@ import com.onlab.oauth.R
 import com.onlab.oauth.adapters.ContentBrowserAdapter
 import com.onlab.oauth.classes.StorageRepository
 import com.onlab.oauth.databinding.ActivityMainBinding
+import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.enums.StorageSource
 import com.onlab.oauth.interfaces.ICloudStorage
+import com.onlab.oauth.interfaces.ICloudStorageContent
 import com.onlab.oauth.interfaces.IConnectionService
 import com.onlab.oauth.interfaces.IViewItemClickedListener
+import com.onlab.oauth.models.StorageContent
 import com.onlab.oauth.services.DriveService
 import com.onlab.oauth.services.GoogleConnectionService
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +31,9 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: ContentBrowserAdapter
     private lateinit var googleConnectionService: IConnectionService
+    private var folderHistory = mutableListOf<ICloudStorageContent>(
+        StorageContent("Root", "root", ContentType.DIRECTORY, StorageSource.GOOGLE_DRIVE)  // ezt ki kell cserélni, mert a root az mind a 3 source
+    )
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,11 +58,20 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        // when drawer is opened -> close
         if (this.binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
             this.binding.drawerLayout.closeDrawer(GravityCompat.START)
-        } else {
-            onBackPressedDispatcher.onBackPressed()
+            return
         }
+
+        // go back in the folder history
+        if (1 < folderHistory.count()) {
+            folderHistory.removeLast()
+            navigateToFolder(folderHistory.last())
+            return
+        }
+
+        onBackPressedDispatcher.onBackPressed()
     }
 
     private fun initStorages() {
@@ -145,12 +160,23 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
         Toast.makeText(this, "Disconnected from Google Drive", Toast.LENGTH_SHORT).show()
     }
 
+
+    private fun navigateToFolder(storageItem: ICloudStorageContent) {
+        if (storageItem.type == ContentType.DIRECTORY) {
+            this.binding.toolbar.tvToolbarCurrentFolder.text = storageItem.name
+            if (folderHistory.last().id != storageItem.id) {
+                folderHistory.add(storageItem)
+            }
+            this.adapter.clear()
+            listDir(StorageRepository.getStorage(storageItem.source.toString())!!, storageItem.id)
+        } else {
+            return
+        }
+    }
+
+
     override fun onItemClicked(position: Int) {
-        Log.d(TAG, position.toString())
-        val item = this.adapter.getItemAt(position)
-        Log.d(TAG, item.name)
-        this.adapter.clear()
-        listDir(StorageRepository.getStorage(item.source.toString())!!, item.id)
+        navigateToFolder(this.adapter.getItemAt(position))
     }
 
     override fun onItemLongClicked(position: Int) {
