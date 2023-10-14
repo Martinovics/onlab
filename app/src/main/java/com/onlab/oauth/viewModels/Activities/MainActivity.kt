@@ -7,6 +7,7 @@ import android.view.MenuItem
 import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.api.services.drive.Drive
 import com.onlab.oauth.R
 import com.onlab.oauth.adapters.ContentBrowserAdapter
@@ -21,6 +22,7 @@ import com.onlab.oauth.interfaces.IViewItemClickedListener
 import com.onlab.oauth.models.StorageContent
 import com.onlab.oauth.services.DriveService
 import com.onlab.oauth.services.GoogleConnectionService
+import com.onlab.oauth.viewModels.Fragments.AddContentBottomSheetFragment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,6 +55,7 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
         initRecycleView()
         initNavigationView()
         initStorages()
+        initAddContentBottomSheet()
     }
 
 
@@ -81,6 +84,13 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
                 DriveService(googleConnectionService.getCloudStorage() as Drive)
             )
             listDir(storage, "root")
+        }
+    }
+
+    private fun initAddContentBottomSheet() {
+        this.binding.btnAddContent.setOnClickListener {
+            val bottomSheet = AddContentBottomSheetFragment()
+            bottomSheet.show(supportFragmentManager, bottomSheet.tag)
         }
     }
 
