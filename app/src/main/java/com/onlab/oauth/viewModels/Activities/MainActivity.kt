@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.MenuItem
+import android.view.View
 import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -15,19 +16,14 @@ import com.onlab.oauth.classes.StorageRepository
 import com.onlab.oauth.databinding.ActivityMainBinding
 import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.enums.StorageSource
-import com.onlab.oauth.interfaces.ICloudStorage
-import com.onlab.oauth.interfaces.ICloudStorageContent
-import com.onlab.oauth.interfaces.IConnectionService
-import com.onlab.oauth.interfaces.IViewItemClickedListener
+import com.onlab.oauth.interfaces.*
 import com.onlab.oauth.models.StorageContent
 import com.onlab.oauth.services.DriveService
 import com.onlab.oauth.services.GoogleConnectionService
 import com.onlab.oauth.viewModels.Fragments.AddContentBottomSheetFragment
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
-class MainActivity : AppCompatActivity(), IViewItemClickedListener {
+class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirectoryDialogListener {
 
     private var TAG = this::class.java.simpleName
     private lateinit var binding: ActivityMainBinding
@@ -44,14 +40,7 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
 
         this.googleConnectionService = GoogleConnectionService(this)
 
-
-        setContentView(this.binding.root)
-        setSupportActionBar(binding.toolbar.root)
-        supportActionBar?.title = ""
-        this.binding.toolbar.btnToolbarHamburgerMenu.setOnClickListener {
-            this.binding.drawerLayout.openDrawer(GravityCompat.START)
-        }
-
+        initToolbar()
         initRecycleView()
         initNavigationView()
         initStorages()
@@ -77,6 +66,18 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
         onBackPressedDispatcher.onBackPressed()
     }
 
+    private fun initToolbar() {
+        setContentView(this.binding.root)
+        setSupportActionBar(binding.toolbar.root)
+        supportActionBar?.title = ""
+        this.binding.toolbar.btnToolbarHamburgerMenu.setOnClickListener {
+            this.binding.drawerLayout.openDrawer(GravityCompat.START)
+        }
+        this.binding.toolbar.btnDelete.setOnClickListener {
+            this.binding.toolbar.btnDelete.visibility = View.GONE
+        }
+    }
+
     private fun initStorages() {
         if (this.googleConnectionService.isLoggedIn()) {
             val storage = StorageRepository.registerStorage(
@@ -89,7 +90,7 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
 
     private fun initAddContentBottomSheet() {
         this.binding.btnAddContent.setOnClickListener {
-            val bottomSheet = AddContentBottomSheetFragment()
+            val bottomSheet = AddContentBottomSheetFragment(this)
             bottomSheet.show(supportFragmentManager, bottomSheet.tag)
         }
     }
@@ -97,9 +98,6 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
     private fun listDir(storage: ICloudStorage, directoryID: String) {
         CoroutineScope(Dispatchers.Main).launch {
             val contents = storage.listDir(directoryID)
-//            for (content in contents) {
-//                this@MainActivity.adapter.add(content)  // addrange does not work -> inconsistency error
-//            }
             this@MainActivity.adapter.addRange(contents)
         }
     }
@@ -170,7 +168,6 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
         Toast.makeText(this, "Disconnected from Google Drive", Toast.LENGTH_SHORT).show()
     }
 
-
     private fun navigateToFolder(storageItem: ICloudStorageContent) {
         if (storageItem.type == ContentType.DIRECTORY) {
             this.binding.toolbar.tvToolbarCurrentFolder.text = storageItem.name
@@ -184,13 +181,47 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener {
         }
     }
 
-
     override fun onItemClicked(position: Int) {
+        this.binding.toolbar.btnDelete.visibility = View.GONE
         navigateToFolder(this.adapter.getItemAt(position))
     }
 
-    override fun onItemLongClicked(position: Int) {
+    override fun onItemLongClicked(position: Int): Boolean {
         Toast.makeText(this, "Item at $position long-clicked", Toast.LENGTH_LONG).show()
+        this.binding.toolbar.btnDelete.visibility = View.VISIBLE
 
+        val storageContent = this.adapter.getItemAt(position)
+        this.binding.toolbar.btnDelete.setOnClickListener {
+            val service = StorageRepository.getStorage(storageContent.source.toString())
+            if (service == null) {
+                Log.d(TAG, "Storage service was null. Source: ${storageContent.source}")
+            }
+            CoroutineScope(Dispatchers.Main).launch {
+                val isRemoved = service!!.removeContent(storageContent.id)
+                if (isRemoved) {
+                    this@MainActivity.adapter.removeAt(position)
+                    this@MainActivity.binding.toolbar.btnDelete.visibility = View.GONE
+                    Toast.makeText(this@MainActivity, "Removed ${storageContent.name}", Toast.LENGTH_SHORT).show()
+                } else {
+                    Log.d(TAG, "Could not delete content. Name: ${storageContent.name}")
+                }
+            }
+        }
+        return true
+    }
+
+    override fun onAddDirectoryDialogPositiveClicked(directoryName: String) {
+        val currentDirectory = folderHistory.last()
+        val storageService = StorageRepository.getStorage(currentDirectory.source.toString())
+        CoroutineScope(Dispatchers.Main).launch {
+            val newDirectory = storageService?.createDir(currentDirectory.id, directoryName)
+            if (newDirectory != null) {
+                this@MainActivity.adapter.add(newDirectory)
+            }
+        }
+    }
+
+    override fun onAddDirectoryDialogNegativeClicked() {
+        // nem kell csinálni semmit
     }
 }

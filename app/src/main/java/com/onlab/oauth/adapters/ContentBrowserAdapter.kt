@@ -32,6 +32,7 @@ class ContentBrowserAdapter(private val onClickListener: IViewItemClickedListene
         holder.binding.tvDescription.text = item.type.toString()
 
         holder.binding.root.setOnClickListener { onClickListener.onItemClicked(position) }
+        holder.binding.root.setOnLongClickListener { onClickListener.onItemLongClicked(position) }
     }
 
 

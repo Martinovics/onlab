@@ -1,6 +1,8 @@
 package com.onlab.oauth.services
 
 import android.util.Log
+import com.google.android.gms.tasks.Tasks
+import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.onlab.oauth.interfaces.ICloudStorage
@@ -10,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.*
 
 
 class DriveService(private val drive: Drive) : ICloudStorage {
@@ -28,6 +31,35 @@ class DriveService(private val drive: Drive) : ICloudStorage {
                 Log.d(TAG, "Name: ${content.name} | ID: ${content.id} | Mime: ${content.type} | Source: ${content.source}")
             }
             contents
+        }
+    }
+
+    override suspend fun createDir(parentDirectoryId: String, directoryName: String): ICloudStorageContent? {
+        val fileMetadata = File().apply {
+            name = directoryName
+            mimeType = "application/vnd.google-apps.folder"
+            parents = Collections.singletonList(parentDirectoryId)
+        }
+        return withContext(Dispatchers.IO) {
+            try {
+                val directory = drive.files().create(fileMetadata)
+                    .setFields("id, name, mimeType")
+                    .execute()
+                directory?.let { GoogleDriveContent(it.name, it.id, it.mimeType) }
+            } catch (ex: GoogleJsonResponseException) {
+                null
+            }
+        }
+    }
+
+    override suspend fun removeContent(contentId: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                drive.files().delete(contentId).execute()
+                true
+            } catch (ex: GoogleJsonResponseException) {
+                false
+            }
         }
     }
 
