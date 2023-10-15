@@ -8,19 +8,18 @@ import android.view.View
 import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.api.services.drive.Drive
 import com.onlab.oauth.R
 import com.onlab.oauth.adapters.ContentBrowserAdapter
+import com.onlab.oauth.classes.FolderHistory
 import com.onlab.oauth.classes.StorageRepository
 import com.onlab.oauth.databinding.ActivityMainBinding
 import com.onlab.oauth.enums.ContentType
-import com.onlab.oauth.enums.StorageSource
+import com.onlab.oauth.enums.ContentSource
 import com.onlab.oauth.interfaces.*
-import com.onlab.oauth.models.StorageContent
-import com.onlab.oauth.services.DriveService
+import com.onlab.oauth.services.GoogleDriveService
 import com.onlab.oauth.services.GoogleConnectionService
-import com.onlab.oauth.viewModels.Fragments.AddContentBottomSheetFragment
+import com.onlab.oauth.viewModels.Fragments.AddContentBottomFragment
 import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirectoryDialogListener {
@@ -29,9 +28,7 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: ContentBrowserAdapter
     private lateinit var googleConnectionService: IConnectionService
-    private var folderHistory = mutableListOf<ICloudStorageContent>(
-        StorageContent("Root", "root", ContentType.DIRECTORY, StorageSource.GOOGLE_DRIVE)  // ezt ki kell cserélni, mert a root az mind a 3 source
-    )
+    private val folderHistory = FolderHistory()
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,10 +53,13 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
             return
         }
 
-        // go back in the folder history
-        if (1 < folderHistory.count()) {
-            folderHistory.removeLast()
-            navigateToFolder(folderHistory.last())
+        // navigate in the folder history
+        if (folderHistory.size == 1) {  // load roots
+            this.folderHistory.removeLast()
+            listRegisteredStorageRootFolders()
+            return
+        } else if (1 < folderHistory.size) {  // go to previous folder
+            navigateToFolder(folderHistory.previous!!)
             return
         }
 
@@ -70,37 +70,59 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
         setContentView(this.binding.root)
         setSupportActionBar(binding.toolbar.root)
         supportActionBar?.title = ""
-        this.binding.toolbar.btnToolbarHamburgerMenu.setOnClickListener {
+        this.binding.toolbar.btnHamburgerMenu.setOnClickListener {
             this.binding.drawerLayout.openDrawer(GravityCompat.START)
         }
-        this.binding.toolbar.btnDelete.setOnClickListener {
-            this.binding.toolbar.btnDelete.visibility = View.GONE
+        this.binding.toolbar.btnRemove.setOnClickListener {
+            this.binding.toolbar.btnRemove.visibility = View.GONE
         }
     }
 
     private fun initStorages() {
         if (this.googleConnectionService.isLoggedIn()) {
-            val storage = StorageRepository.registerStorage(
-                StorageSource.GOOGLE_DRIVE.toString(),
-                DriveService(googleConnectionService.getCloudStorage() as Drive)
+            StorageRepository.registerStorage(
+                ContentSource.GOOGLE_DRIVE.toString(),
+                GoogleDriveService(googleConnectionService.getCloudStorage() as Drive)
             )
-            listDir(storage, "root")
+            listRegisteredStorageRootFolders()
+        }
+    }
+
+    private fun listRegisteredStorageRootFolders() {
+        val storagesKeys = StorageRepository.getRegisteredStorageKeys()
+        for (storageKey in storagesKeys) {
+            val storageService = StorageRepository.getStorage(storageKey)
+            if (storageService == null) {
+                Log.d(TAG, "Couldn't get storage service. Storage service $storageKey was null")
+                continue
+            }
+
+            CoroutineScope(Dispatchers.Main).launch {
+                val rootFolder = storageService.getCustomRootFolder()
+                if (rootFolder == null) {
+                    Log.d(TAG,"Couldn't not get root folder for $storageKey")
+                    return@launch
+                }
+
+                val contents = storageService.listDir(rootFolder.id)
+                if (contents == null) {
+                    Log.d(TAG,"Couldn't list contents of folder ${rootFolder.name}")
+                } else {
+                    // todo log
+                    this@MainActivity.adapter.addRange(contents)
+                }
+            }
         }
     }
 
     private fun initAddContentBottomSheet() {
         this.binding.btnAddContent.setOnClickListener {
-            val bottomSheet = AddContentBottomSheetFragment(this)
+            val bottomSheet = AddContentBottomFragment(this)
             bottomSheet.show(supportFragmentManager, bottomSheet.tag)
         }
     }
 
-    private fun listDir(storage: ICloudStorage, directoryID: String) {
-        CoroutineScope(Dispatchers.Main).launch {
-            val contents = storage.listDir(directoryID)
-            this@MainActivity.adapter.addRange(contents)
-        }
-    }
+
 
     private fun initRecycleView() {
         this.adapter = ContentBrowserAdapter(this)
@@ -159,7 +181,7 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
         Toast.makeText(this, "Connected to Google Drive", Toast.LENGTH_SHORT).show()
 
         StorageRepository.registerStorage(
-            "GoogleDrive", DriveService(googleConnectionService.getCloudStorage() as Drive)
+            "GoogleDrive", GoogleDriveService(googleConnectionService.getCloudStorage() as Drive)
         )
     }
 
@@ -168,42 +190,60 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
         Toast.makeText(this, "Disconnected from Google Drive", Toast.LENGTH_SHORT).show()
     }
 
-    private fun navigateToFolder(storageItem: ICloudStorageContent) {
-        if (storageItem.type == ContentType.DIRECTORY) {
-            this.binding.toolbar.tvToolbarCurrentFolder.text = storageItem.name
-            if (folderHistory.last().id != storageItem.id) {
-                folderHistory.add(storageItem)
-            }
-            this.adapter.clear()
-            listDir(StorageRepository.getStorage(storageItem.source.toString())!!, storageItem.id)
-        } else {
+    private fun navigateToFolder(content: IStorageContent) {
+        if (content.type != ContentType.DIRECTORY) {
             return
+        }
+
+        val storageService = StorageRepository.getStorage(content.source.toString())
+        if (storageService == null) {
+            Toast.makeText(this, "Connection error. Try to reconnect to ${content.source}", Toast.LENGTH_SHORT).show()
+            Log.d(TAG, "Couldn't get storage service. Storage service ${content.source} was null")
+            return
+        }
+
+        this.binding.toolbar.tvCurrentFolder.text = content.name
+        this.folderHistory.add(content)
+        this.adapter.clear()
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val contents = storageService.listDir(content.id)
+            if (contents == null) {
+                Log.d(TAG,"Couldn't list contents of folder ${content.name}")
+            } else {
+                // todo log
+                this@MainActivity.adapter.addRange(contents)
+            }
         }
     }
 
     override fun onItemClicked(position: Int) {
-        this.binding.toolbar.btnDelete.visibility = View.GONE
+        this.binding.toolbar.btnRemove.visibility = View.GONE
         navigateToFolder(this.adapter.getItemAt(position))
     }
 
     override fun onItemLongClicked(position: Int): Boolean {
-        Toast.makeText(this, "Item at $position long-clicked", Toast.LENGTH_LONG).show()
-        this.binding.toolbar.btnDelete.visibility = View.VISIBLE
+        this.binding.toolbar.btnRemove.visibility = View.VISIBLE
 
-        val storageContent = this.adapter.getItemAt(position)
-        this.binding.toolbar.btnDelete.setOnClickListener {
-            val service = StorageRepository.getStorage(storageContent.source.toString())
-            if (service == null) {
-                Log.d(TAG, "Storage service was null. Source: ${storageContent.source}")
-            }
+        val content = this.adapter.getItemAt(position)
+
+        val storageService = StorageRepository.getStorage(content.source.toString())
+        if (storageService == null) {
+            Log.d(TAG, "Couldn't get storage service. Storage service ${content.source} was null")
+            return true
+        }
+
+        this.binding.toolbar.btnRemove.setOnClickListener {
             CoroutineScope(Dispatchers.Main).launch {
-                val isRemoved = service!!.removeContent(storageContent.id)
-                if (isRemoved) {
+                if (storageService.removeContent(content.id)) {
                     this@MainActivity.adapter.removeAt(position)
-                    this@MainActivity.binding.toolbar.btnDelete.visibility = View.GONE
-                    Toast.makeText(this@MainActivity, "Removed ${storageContent.name}", Toast.LENGTH_SHORT).show()
+                    this@MainActivity.binding.toolbar.btnRemove.visibility = View.GONE
+
+                    Toast.makeText(this@MainActivity, "Removed ${content.name}", Toast.LENGTH_SHORT).show()
+                    Log.d(TAG, "Removed content with name: ${content.name}")
                 } else {
-                    Log.d(TAG, "Could not delete content. Name: ${storageContent.name}")
+                    Toast.makeText(this@MainActivity, "Couldn't remove ${content.name}", Toast.LENGTH_SHORT).show()
+                    Log.d(TAG, "Couldn't remove content with name: ${content.name}")
                 }
             }
         }
@@ -211,17 +251,31 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
     }
 
     override fun onAddDirectoryDialogPositiveClicked(directoryName: String) {
-        val currentDirectory = folderHistory.last()
-        val storageService = StorageRepository.getStorage(currentDirectory.source.toString())
+        val currentFolder = this.folderHistory.current
+        if (currentFolder == null) {
+            Toast.makeText(this, "Couldn't create folder", Toast.LENGTH_SHORT).show()
+            Log.d(TAG, "Couldn't create folder. No parent directory found.")
+            return
+        }
+
+        val storageService = StorageRepository.getStorage(currentFolder.source.toString())
+        if (storageService == null) {
+            Toast.makeText(this, "Couldn't create folder", Toast.LENGTH_SHORT).show()
+            Log.d(TAG, "Couldn't get storage service. Storage service ${currentFolder.source} was null")
+            return
+        }
+
         CoroutineScope(Dispatchers.Main).launch {
-            val newDirectory = storageService?.createDir(currentDirectory.id, directoryName)
+            val newDirectory = storageService.createDir(currentFolder.id, directoryName)
             if (newDirectory != null) {
                 this@MainActivity.adapter.add(newDirectory)
+                Log.d(TAG, "Created folder with name ${newDirectory.name}")
+            } else {
+                Log.d(TAG, "Couldn't create folder. Storage service returned null.")
             }
         }
     }
 
     override fun onAddDirectoryDialogNegativeClicked() {
-        // nem kell csinálni semmit
     }
 }

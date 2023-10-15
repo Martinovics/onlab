@@ -13,7 +13,7 @@
         >
 
         <ImageButton
-            android:id="@+id/btnToolbarHamburgerMenu"
+            android:id="@+id/btnHamburgerMenu"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/hamburger_icon"
@@ -23,18 +23,18 @@
             app:layout_constraintBottom_toBottomOf="parent" />
 
         <TextView
-            android:id="@+id/tvToolbarCurrentFolder"
+            android:id="@+id/tvCurrentFolder"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="Root"
             android:textSize="18sp"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/btnToolbarHamburgerMenu"
+            app:layout_constraintStart_toEndOf="@+id/btnHamburgerMenu"
             app:layout_constraintTop_toTopOf="parent" />
 
         <ImageButton
-            android:id="@+id/btnDelete"
+            android:id="@+id/btnRemove"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/ic_delete_black"

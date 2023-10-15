@@ -4,20 +4,14 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.onlab.oauth.databinding.ContentBrowserItemBinding
-import com.onlab.oauth.interfaces.ICloudStorageContent
+import com.onlab.oauth.interfaces.IStorageContent
 import com.onlab.oauth.interfaces.IViewItemClickedListener
-import com.onlab.oauth.models.GoogleDriveContent
 
 
 class ContentBrowserAdapter(private val onClickListener: IViewItemClickedListener) : RecyclerView.Adapter<ContentBrowserAdapter.ItemViewHolder>() {
     inner class ItemViewHolder(val binding: ContentBrowserItemBinding) : RecyclerView.ViewHolder(binding.root)
 
-    private var items = mutableListOf<ICloudStorageContent>(
-//        GoogleDriveContent("name1", "id1", "folder"),
-//        GoogleDriveContent("name2", "id2", "folder"),
-//        GoogleDriveContent("name3", "id3", "file"),
-//        GoogleDriveContent("name4", "id4", "file"),
-    )
+    private var items = mutableListOf<IStorageContent>()
 
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ItemViewHolder(
@@ -41,13 +35,21 @@ class ContentBrowserAdapter(private val onClickListener: IViewItemClickedListene
     }
 
 
-    fun add(item: ICloudStorageContent): Unit {
+    fun add(item: IStorageContent) {
         this.items.add(item)
         notifyItemInserted(itemCount - 1)
     }
 
 
-    fun addRange(items: List<ICloudStorageContent>): Unit {
+    fun addRange(items: List<IStorageContent>) {
+        if (items.isEmpty()) {
+            return
+        }
+        if (items.size == 1) {
+            this.add(items[0])
+            return
+        }
+
         val positionFrom = this.itemCount - 1
         this.items.addAll(items)
         notifyItemRangeInserted(positionFrom, this.itemCount - 1)
@@ -65,7 +67,7 @@ class ContentBrowserAdapter(private val onClickListener: IViewItemClickedListene
         notifyItemRangeRemoved(0, size)
     }
 
-    fun getItemAt(position: Int): ICloudStorageContent {
+    fun getItemAt(position: Int): IStorageContent {
         return this.items[position]
     }
 }

@@ -11,7 +11,7 @@ import com.onlab.oauth.databinding.AddContentBottomSheetBinding
 import com.onlab.oauth.interfaces.IAddDirectoryDialogListener
 
 
-class AddContentBottomSheetFragment(private val listener: IAddDirectoryDialogListener) : BottomSheetDialogFragment(), IAddDirectoryDialogListener {
+class AddContentBottomFragment(private val listener: IAddDirectoryDialogListener) : BottomSheetDialogFragment(), IAddDirectoryDialogListener {
 
     private val tag = "AddContentFragment"
     private var _binding: AddContentBottomSheetBinding? = null

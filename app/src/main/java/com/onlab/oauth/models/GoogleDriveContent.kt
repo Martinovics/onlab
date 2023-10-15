@@ -1,16 +1,16 @@
 package com.onlab.oauth.models
 
 import com.onlab.oauth.enums.ContentType
-import com.onlab.oauth.enums.StorageSource
-import com.onlab.oauth.interfaces.ICloudStorageContent
+import com.onlab.oauth.enums.ContentSource
+import com.onlab.oauth.interfaces.IStorageContent
 
 class GoogleDriveContent(
     override val name: String,
     override val id: String,
     private val contentType: Any
-) : ICloudStorageContent {
+) : IStorageContent {
 
-    override val source = StorageSource.GOOGLE_DRIVE
+    override val source = ContentSource.GOOGLE_DRIVE
 
     override val type: ContentType = when (contentType) {
         is String -> stringToContentType(contentType)
