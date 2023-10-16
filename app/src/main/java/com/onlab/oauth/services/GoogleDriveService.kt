@@ -20,7 +20,6 @@ class GoogleDriveService(private val drive: Drive) : IStorageService {
     companion object {
         private const val TAG: String = "DriveService"
         private val rootFolderPath = listOf("Secrets")  // "root" implicitly handled
-        //private val rootFolderPath = listOf<String>()  // "root" implicitly handled
     }
 
     override suspend fun listDir(directoryID: String): List<IStorageContent>? {

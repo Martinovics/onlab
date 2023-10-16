@@ -1,9 +1,8 @@
-package com.onlab.oauth.viewModels.Activities
+package com.onlab.oauth.viewModels.activities
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
-import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.core.view.GravityCompat
@@ -11,6 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.api.services.drive.Drive
 import com.onlab.oauth.R
 import com.onlab.oauth.adapters.ContentBrowserAdapter
+import com.onlab.oauth.classes.ConnectionRepository
 import com.onlab.oauth.classes.FolderHistory
 import com.onlab.oauth.classes.StorageRepository
 import com.onlab.oauth.databinding.ActivityMainBinding
@@ -19,15 +19,14 @@ import com.onlab.oauth.enums.ContentSource
 import com.onlab.oauth.interfaces.*
 import com.onlab.oauth.services.GoogleDriveService
 import com.onlab.oauth.services.GoogleConnectionService
-import com.onlab.oauth.viewModels.Fragments.AddContentBottomFragment
+import com.onlab.oauth.viewModels.fragments.AddContentBottomFragment
 import kotlinx.coroutines.*
 
-class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirectoryDialogListener {
+class MainActivity : AppCompatActivity(), IRecyclerItemClickedListener, IAddDirectoryDialogListener {
 
     private var TAG = this::class.java.simpleName
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: ContentBrowserAdapter
-    private lateinit var googleConnectionService: IConnectionService
     private val folderHistory = FolderHistory()
 
 
@@ -35,13 +34,13 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
         super.onCreate(savedInstanceState)
         this.binding = ActivityMainBinding.inflate(layoutInflater)
 
-        this.googleConnectionService = GoogleConnectionService(this)
-
+        // order matters
         initToolbar()
         initRecycleView()
+        initAddContentBottomFragment()
+        initConnections()
         initNavigationView()
         initStorages()
-        initAddContentBottomSheet()
     }
 
 
@@ -78,24 +77,39 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
         }
     }
 
+    private fun initConnections() {
+        // register connection services here ==========
+        ConnectionRepository.register(ContentSource.GOOGLE_DRIVE.toString(), GoogleConnectionService(this))
+    }
+
     private fun initStorages() {
-        if (this.googleConnectionService.isLoggedIn()) {
-            StorageRepository.registerStorage(
-                ContentSource.GOOGLE_DRIVE.toString(),
-                GoogleDriveService(googleConnectionService.getCloudStorage() as Drive)
-            )
-            listRegisteredStorageRootFolders()
+        for (kv in ConnectionRepository.registeredEntries) {
+            val key = kv.key
+            val connectionService = kv.value
+
+            if (connectionService.isLoggedIn()) {
+                val storageService = connectionService.getCloudStorage()
+                registerStorage(key, storageService)
+            }
+
+        }
+        listRegisteredStorageRootFolders()
+    }
+
+    private fun registerStorage(key: String, storageService: Any) {
+        // register storage services here ==========
+        when (key) {
+            ContentSource.GOOGLE_DRIVE.toString() ->
+                StorageRepository.register(key, GoogleDriveService(storageService as Drive))
+            else ->
+                throw Exception("Unknown storage service: $key")
         }
     }
 
     private fun listRegisteredStorageRootFolders() {
-        val storagesKeys = StorageRepository.getRegisteredStorageKeys()
-        for (storageKey in storagesKeys) {
-            val storageService = StorageRepository.getStorage(storageKey)
-            if (storageService == null) {
-                Log.d(TAG, "Couldn't get storage service. Storage service $storageKey was null")
-                continue
-            }
+        for (kv in StorageRepository.registeredEntries) {
+            val storageKey = kv.key
+            val storageService = kv.value
 
             CoroutineScope(Dispatchers.Main).launch {
                 val rootFolder = storageService.getCustomRootFolder()
@@ -107,22 +121,21 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
                 val contents = storageService.listDir(rootFolder.id)
                 if (contents == null) {
                     Log.d(TAG,"Couldn't list contents of folder ${rootFolder.name}")
-                } else {
-                    // todo log
-                    this@MainActivity.adapter.addRange(contents)
+                    return@launch
                 }
+                this@MainActivity.adapter.addRange(contents)
+                Log.d(TAG, "Listed ${contents.size} root folders from $storageKey")
+                contents.forEach { content -> Log.d(TAG, "\t${content.name} (${content.id})") }
             }
         }
     }
 
-    private fun initAddContentBottomSheet() {
+    private fun initAddContentBottomFragment() {
         this.binding.btnAddContent.setOnClickListener {
             val bottomSheet = AddContentBottomFragment(this)
             bottomSheet.show(supportFragmentManager, bottomSheet.tag)
         }
     }
-
-
 
     private fun initRecycleView() {
         this.adapter = ContentBrowserAdapter(this)
@@ -130,64 +143,61 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
         this.binding.rvContents.layoutManager = LinearLayoutManager(this)
     }
 
-
     private fun initNavigationView() {
 
-        // check google connection | set texts
-        val drawerMenuItem = this.binding.drawerMenu.menu.findItem(R.id.drawerMenuGoogleDrive)
-        if (this.googleConnectionService.isLoggedIn()) {
-            drawerMenuItem.title = "Disconnect Google Drive"
-        } else {
-            drawerMenuItem.title = "Connect Google Drive"
-        }
-
-        // check OneDrive connection
-
-        // check Dropbox connection
-
-        this.binding.drawerMenu.setNavigationItemSelectedListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.drawerMenuGoogleDrive -> {
-                    Log.d(TAG, "${menuItem.title} clicked")
-                    if (googleConnectionService.isLoggedIn()) {
-                        this.googleConnectionService.signOut(
-                            callback_success = { googleDisconnectedCallback(menuItem) },
-                            callback_fail = { Toast.makeText(this, "Disconnect failed", Toast.LENGTH_SHORT).show() })
-                    } else {
-                        this.googleConnectionService.signIn(
-                            callback_success = { googleConnectedCallback(menuItem) },
-                            callback_fail = { Toast.makeText(this, "Connect failed", Toast.LENGTH_SHORT).show() })
-                    }
-                    true
-                }
-                R.id.drawerMenuOneDrive -> {
-                    Log.d(TAG, "${menuItem.title} clicked")
-                    true
-                }
-                R.id.drawerMenuDropBox -> {
-                    Log.d(TAG, "${menuItem.title} clicked")
-                    true
-                }
-                else -> {
-                    Log.d(TAG, "Unknown drawer item clicked")
-                    false
-                }
+        // set drawer menu connection titles
+        for (kv in ConnectionRepository.registeredEntries) {
+            val connectionService = kv.value
+            val drawerMenuItem = this.binding.drawerMenu.menu.findItem(connectionService.menuItemId)
+            if (connectionService.isLoggedIn()) {
+                drawerMenuItem.title = "Disconnect ${connectionService.title}"
+            } else {
+                drawerMenuItem.title = "Connect ${connectionService.title}"
             }
         }
+
+        this.binding.drawerMenu.setNavigationItemSelectedListener { menuItem ->
+            var setListener = false
+            for (kv in ConnectionRepository.registeredEntries) {
+                val connectionService = kv.value
+                if (connectionService.menuItemId == menuItem.itemId) {
+                    connectionDrawerMenuListener(connectionService)
+                    setListener = true
+                }
+            }
+            setListener
+        }
     }
 
-    private fun googleConnectedCallback(menuItem: MenuItem) {
-        menuItem.title = "Disconnect from Google Drive"
-        Toast.makeText(this, "Connected to Google Drive", Toast.LENGTH_SHORT).show()
-
-        StorageRepository.registerStorage(
-            "GoogleDrive", GoogleDriveService(googleConnectionService.getCloudStorage() as Drive)
-        )
-    }
-
-    private fun googleDisconnectedCallback(menuItem: MenuItem) {
-        menuItem.title = "Connect to Google Drive"
-        Toast.makeText(this, "Disconnected from Google Drive", Toast.LENGTH_SHORT).show()
+    private fun connectionDrawerMenuListener(connectionService: IConnectionService) {
+        val drawerMenuItem = this.binding.drawerMenu.menu.findItem(connectionService.menuItemId)
+        if (connectionService.isLoggedIn()) {
+            connectionService.signOut(
+                callback_success = {
+                    drawerMenuItem.title = "Connect to ${connectionService.title}"
+                    StorageRepository.remove(connectionService.source.toString())
+                    Log.i(TAG, "Disconnected from ${connectionService.title}")
+                    Toast.makeText(this, "Disconnected from ${connectionService.title}", Toast.LENGTH_SHORT).show()
+                },
+                callback_fail = {
+                    Log.e(TAG, "Disconnected from ${connectionService.title} failed")
+                    Toast.makeText(this, "Disconnect failed", Toast.LENGTH_SHORT).show()
+                }
+            )
+        } else {
+            connectionService.signIn(
+                callback_success = {
+                    drawerMenuItem.title = "Disconnect from ${connectionService.title}"
+                    registerStorage(connectionService.source.toString(), connectionService.getCloudStorage())
+                    Log.d(TAG, "Connected to ${connectionService.title}")
+                    Toast.makeText(this, "Connected to ${connectionService.title}", Toast.LENGTH_SHORT).show()
+                },
+                callback_fail = {
+                    Log.e(TAG, "Connection to ${connectionService.title} failed")
+                    Toast.makeText(this, "Connection failed", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
     }
 
     private fun navigateToFolder(content: IStorageContent) {
@@ -195,7 +205,7 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
             return
         }
 
-        val storageService = StorageRepository.getStorage(content.source.toString())
+        val storageService = StorageRepository.get(content.source.toString())
         if (storageService == null) {
             Toast.makeText(this, "Connection error. Try to reconnect to ${content.source}", Toast.LENGTH_SHORT).show()
             Log.d(TAG, "Couldn't get storage service. Storage service ${content.source} was null")
@@ -210,10 +220,11 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
             val contents = storageService.listDir(content.id)
             if (contents == null) {
                 Log.d(TAG,"Couldn't list contents of folder ${content.name}")
-            } else {
-                // todo log
-                this@MainActivity.adapter.addRange(contents)
+                return@launch
             }
+            this@MainActivity.adapter.addRange(contents)
+            Log.d(TAG, "Listed ${contents.size} contents from ${content.source}")
+            contents.forEach { content -> Log.d(TAG, "\t${content.name} (${content.id})") }
         }
     }
 
@@ -227,7 +238,7 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
 
         val content = this.adapter.getItemAt(position)
 
-        val storageService = StorageRepository.getStorage(content.source.toString())
+        val storageService = StorageRepository.get(content.source.toString())
         if (storageService == null) {
             Log.d(TAG, "Couldn't get storage service. Storage service ${content.source} was null")
             return true
@@ -258,7 +269,7 @@ class MainActivity : AppCompatActivity(), IViewItemClickedListener, IAddDirector
             return
         }
 
-        val storageService = StorageRepository.getStorage(currentFolder.source.toString())
+        val storageService = StorageRepository.get(currentFolder.source.toString())
         if (storageService == null) {
             Toast.makeText(this, "Couldn't create folder", Toast.LENGTH_SHORT).show()
             Log.d(TAG, "Couldn't get storage service. Storage service ${currentFolder.source} was null")

@@ -1,4 +1,4 @@
-package com.onlab.oauth.viewModels.Fragments
+package com.onlab.oauth.viewModels.fragments
 
 import android.app.AlertDialog
 import android.app.Dialog

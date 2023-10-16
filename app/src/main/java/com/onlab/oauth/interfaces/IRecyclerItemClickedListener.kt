@@ -1,6 +1,6 @@
 package com.onlab.oauth.interfaces
 
-interface IViewItemClickedListener {
+interface IRecyclerItemClickedListener {
     fun onItemClicked(position: Int): Unit
     fun onItemLongClicked(position: Int): Boolean
 }

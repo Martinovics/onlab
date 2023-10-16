@@ -4,7 +4,7 @@
     android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".viewModels.Activities.MainActivity">
+    tools:context=".viewModels.activities.MainActivity">
 
 
     <!-- Fő tartalom (ez lehet egy RelativeLayout, LinearLayout, stb.) -->

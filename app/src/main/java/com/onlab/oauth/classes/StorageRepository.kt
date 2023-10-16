@@ -6,16 +6,21 @@ import com.onlab.oauth.interfaces.IStorageService
 object StorageRepository {
     private val storages: MutableMap<String, IStorageService> = mutableMapOf()
 
-    fun registerStorage(key: String, storage: IStorageService): IStorageService {
+    val registeredEntries: Set<Map.Entry<String, IStorageService>>
+        get() {
+            return storages.entries
+        }
+
+    fun register(key: String, storage: IStorageService): IStorageService {
         storages[key] = storage
         return storages[key]!!
     }
 
-    fun getStorage(key: String): IStorageService? {
-        return storages[key]
+    fun remove(key: String): Boolean {
+        return storages.remove(key) != null
     }
 
-    fun getRegisteredStorageKeys(): MutableIterable<String> {
-        return storages.keys
+    fun get(key: String): IStorageService? {
+        return storages[key]
     }
 }

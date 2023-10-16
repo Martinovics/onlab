@@ -8,13 +8,15 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.tasks.Task
+import com.onlab.oauth.R
 import com.onlab.oauth.classes.GoogleHelper
+import com.onlab.oauth.enums.ContentSource
 import com.onlab.oauth.interfaces.IConnectionService
 
 
 class GoogleConnectionService(private val activity: AppCompatActivity) : IConnectionService {
 
-    private val Tag = "GoogleConnectionService"
+    private val tag = "GoogleConnectionService"
     private val helper: GoogleHelper = GoogleHelper(activity)
     private val gsc = helper.getSignInClient()
 
@@ -25,6 +27,15 @@ class GoogleConnectionService(private val activity: AppCompatActivity) : IConnec
             handleSignIn(result.data)
         }
     }
+
+    override val title: String
+        get() = "Google Drive"
+
+    override val menuItemId: Int
+        get() = R.id.drawerMenuGoogleDrive
+
+    override val source: ContentSource
+        get() = ContentSource.GOOGLE_DRIVE
 
     override fun isLoggedIn(): Boolean {
         return helper.isLoggedIn()
@@ -40,10 +51,10 @@ class GoogleConnectionService(private val activity: AppCompatActivity) : IConnec
         val task = GoogleSignIn.getSignedInAccountFromIntent(data)
         try {
             val account = task.getResult(ApiException::class.java)
-            Log.d(Tag, "Logged to google as ${account.displayName}")
+            Log.d(tag, "Logged to google as ${account.displayName}")
             this.loginCallbackSuccess?.invoke()
         } catch (e: ApiException) {
-            Log.w(Tag, "Failed to login to google: err=" + e.statusCode)
+            Log.w(tag, "Failed to login to google: err=" + e.statusCode)
             this.logoutCallbackFail?.invoke()
         }
     }
@@ -56,10 +67,10 @@ class GoogleConnectionService(private val activity: AppCompatActivity) : IConnec
 
     private fun handleSignOut(task: Task<Void>, callback_success: (() -> Unit)?, callback_fail: (() -> Unit)?) {
         if (task.isSuccessful) {
-            Log.d(Tag, "Signed-out from google")
+            Log.d(tag, "Signed-out from google")
             callback_success?.invoke()
         } else {
-            Log.w(Tag, "Sign-out from google failed")
+            Log.w(tag, "Sign-out from google failed")
             callback_fail?.invoke()
         }
     }
