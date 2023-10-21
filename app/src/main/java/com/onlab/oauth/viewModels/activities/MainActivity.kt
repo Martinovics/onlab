@@ -21,9 +21,14 @@ import com.onlab.oauth.interfaces.*
 import com.onlab.oauth.services.GoogleConnectionService
 import com.onlab.oauth.services.GoogleDriveService
 import com.onlab.oauth.viewModels.fragments.AddContentBottomFragment
+import com.onlab.oauth.viewModels.fragments.ManageFileBottomFragment
 import kotlinx.coroutines.*
 
-class MainActivity : AppCompatActivity(), IRecyclerItemClickedListener, IAddContentBottomFragmentListener {
+class MainActivity : AppCompatActivity(),
+    IRecyclerItemClickedListener,
+    IAddContentBottomFragmentListener,
+    IManageFileBottomFragmentListener
+{
 
     private var TAG = this::class.java.simpleName
     private lateinit var binding: ActivityMainBinding
@@ -109,6 +114,8 @@ class MainActivity : AppCompatActivity(), IRecyclerItemClickedListener, IAddCont
 
     private fun listRegisteredStorageRootFolders() {
         this.binding.toolbar.tvCurrentFolder.text = "roots"
+        this.adapter.clear()
+
         for (kv in StorageRepository.registeredEntries) {
             val storageKey = kv.key
             val storageService = kv.value
@@ -263,6 +270,12 @@ class MainActivity : AppCompatActivity(), IRecyclerItemClickedListener, IAddCont
         return true
     }
 
+    override fun onMoreClicked(position: Int) {
+        Log.d(TAG, "onMoreClicked at pos=$position")
+        val bottomSheet = ManageFileBottomFragment(this, position)
+        bottomSheet.show(supportFragmentManager, bottomSheet.tag)
+    }
+
     override fun onAddDirectoryDialogPositiveClicked(directoryName: String) {
         val currentFolder = this.folderHistory.current
         if (currentFolder == null) {
@@ -365,5 +378,17 @@ class MainActivity : AppCompatActivity(), IRecyclerItemClickedListener, IAddCont
         }
 
         return this.dropExtension(fileNameWithExtension!!)
+    }
+
+    override fun onManageFileShareButtonClicked(position: Int) {
+        Log.d(TAG, "onManageFileShareButtonClicked pos=$position")
+    }
+
+    override fun onManageFileDownloadButtonClicked(position: Int) {
+        Log.d(TAG, "onManageFileDownloadButtonClicked pos=$position")
+    }
+
+    override fun onManageFileManageKeyButtonClicked(position: Int) {
+        Log.d(TAG, "onManageFileManageKeyButtonClicked pos=$position")
     }
 }

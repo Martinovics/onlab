@@ -1,9 +1,12 @@
 package com.onlab.oauth.adapters
 
+import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.onlab.oauth.databinding.ContentBrowserItemBinding
+import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.interfaces.IStorageContent
 import com.onlab.oauth.interfaces.IRecyclerItemClickedListener
 
@@ -22,9 +25,17 @@ class ContentBrowserAdapter(private val listener: IRecyclerItemClickedListener) 
 
         holder.binding.tvTitle.text = content.name
         holder.binding.tvDescription.text = content.type.toString()
+        holder.binding.tvSource.text = content.source.toString()
+
+        if (content.type == ContentType.FILE) {
+            holder.binding.btnMore.visibility = View.VISIBLE
+        } else {
+            holder.binding.btnMore.visibility = View.INVISIBLE
+        }
 
         holder.binding.root.setOnClickListener { listener.onItemClicked(position) }
         holder.binding.root.setOnLongClickListener { listener.onItemLongClicked(position) }
+        holder.binding.btnMore.setOnClickListener { listener.onMoreClicked(position) }
     }
 
     override fun getItemCount(): Int {
