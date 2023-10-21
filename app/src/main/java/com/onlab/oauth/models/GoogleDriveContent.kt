@@ -12,7 +12,7 @@ class GoogleDriveContent(
 ) : IStorageContent {
 
     constructor(file: File) : this(
-        name = file.name,
+        name = file.name,  // with extension if there's any
         id = file.id,
         contentType = file.mimeType
     )
@@ -32,5 +32,9 @@ class GoogleDriveContent(
         if (contentType.endsWith("shortcut") || contentType.endsWith("drive-sdk"))
             return ContentType.OTHER
         return ContentType.FILE
+    }
+
+    override fun toString(): String {
+        return "name=$name | id=$id | contentType=$contentType | source=$source"
     }
 }

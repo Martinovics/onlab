@@ -128,4 +128,16 @@ class GoogleDriveService(private val drive: Drive) : IStorageService {
             }
         }
     }
+
+    override suspend fun downloadFile(fileId: String): InputStream? {
+        return withContext(Dispatchers.IO) {
+            try {
+                drive.files().get(fileId).executeMediaAsInputStream()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error downloading file from Drive: ${e.localizedMessage}", e)
+                null
+            }
+        }
+    }
+
 }

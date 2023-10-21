@@ -2,6 +2,7 @@ package com.onlab.oauth.viewModels.activities
 
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.View
@@ -23,6 +24,9 @@ import com.onlab.oauth.services.GoogleDriveService
 import com.onlab.oauth.viewModels.fragments.AddContentBottomFragment
 import com.onlab.oauth.viewModels.fragments.ManageFileBottomFragment
 import kotlinx.coroutines.*
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
 
 class MainActivity : AppCompatActivity(),
     IRecyclerItemClickedListener,
@@ -377,7 +381,7 @@ class MainActivity : AppCompatActivity(),
             fileNameWithExtension = "Untitled"
         }
 
-        return this.dropExtension(fileNameWithExtension!!)
+        return fileNameWithExtension!!
     }
 
     override fun onManageFileShareButtonClicked(position: Int) {
@@ -386,6 +390,49 @@ class MainActivity : AppCompatActivity(),
 
     override fun onManageFileDownloadButtonClicked(position: Int) {
         Log.d(TAG, "onManageFileDownloadButtonClicked pos=$position")
+
+        val storageService = getStorageService("Couldn't download file") ?: return
+        val content = this.adapter.getItemAt(position)
+
+        Toast.makeText(this, "Downloading file", Toast.LENGTH_SHORT).show()
+        Log.d(TAG, "Downloading file (name=${content.name})")
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val inputStream = storageService.downloadFile(content.id)
+            if (inputStream == null) {
+                Toast.makeText(this@MainActivity, "Downloading file failed", Toast.LENGTH_SHORT).show()
+                Log.d(TAG, "Downloading file failed (name=${content.name})")
+                return@launch
+            }
+            val isSaved = saveFileToAppDir(inputStream, content.name)
+            if (isSaved) {
+                Toast.makeText(this@MainActivity, "Downloaded file", Toast.LENGTH_SHORT).show()
+                Log.d(TAG, "Downloaded file: ${content.name}. Saved to default app folder")
+            } else {
+                Toast.makeText(this@MainActivity, "Saving file failed", Toast.LENGTH_SHORT).show()
+                Log.d(TAG, "Saved file: ${content.name}. Saved to default app folder")
+            }
+        }
+    }
+
+    private suspend fun saveFileToAppDir(inputStream: InputStream, fileName: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            var success = true
+            val file = File(filesDir, fileName)
+
+            try {
+                file.outputStream().use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            } catch (e: IOException) {
+                e.printStackTrace()
+                success = false
+            } finally {
+                inputStream.close()
+            }
+
+            success
+        }
     }
 
     override fun onManageFileManageKeyButtonClicked(position: Int) {
