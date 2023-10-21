@@ -1,28 +1,29 @@
 package com.onlab.oauth.viewModels.activities
 
-import androidx.appcompat.app.AppCompatActivity
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.api.services.drive.Drive
-import com.onlab.oauth.R
 import com.onlab.oauth.adapters.ContentBrowserAdapter
 import com.onlab.oauth.classes.ConnectionRepository
 import com.onlab.oauth.classes.FolderHistory
 import com.onlab.oauth.classes.StorageRepository
 import com.onlab.oauth.databinding.ActivityMainBinding
-import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.enums.ContentSource
+import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.interfaces.*
-import com.onlab.oauth.services.GoogleDriveService
 import com.onlab.oauth.services.GoogleConnectionService
+import com.onlab.oauth.services.GoogleDriveService
 import com.onlab.oauth.viewModels.fragments.AddContentBottomFragment
 import kotlinx.coroutines.*
 
-class MainActivity : AppCompatActivity(), IRecyclerItemClickedListener, IAddDirectoryDialogListener {
+class MainActivity : AppCompatActivity(), IRecyclerItemClickedListener, IAddContentBottomFragmentListener {
 
     private var TAG = this::class.java.simpleName
     private lateinit var binding: ActivityMainBinding
@@ -107,6 +108,7 @@ class MainActivity : AppCompatActivity(), IRecyclerItemClickedListener, IAddDire
     }
 
     private fun listRegisteredStorageRootFolders() {
+        this.binding.toolbar.tvCurrentFolder.text = "roots"
         for (kv in StorageRepository.registeredEntries) {
             val storageKey = kv.key
             val storageService = kv.value
@@ -288,5 +290,80 @@ class MainActivity : AppCompatActivity(), IRecyclerItemClickedListener, IAddDire
     }
 
     override fun onAddDirectoryDialogNegativeClicked() {
+    }
+
+    private fun getStorageService(errorMessage: String): IStorageService? {
+        val currentFolder = this.folderHistory.current
+        if (currentFolder == null) {
+            Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show()
+            Log.d(TAG, "$errorMessage. Couldn't get current folder from folder history")
+            return null
+        }
+
+        val storageService = StorageRepository.get(currentFolder.source.toString())
+        if (storageService == null) {
+            Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show()
+            Log.d(TAG, "Couldn't get storage service. Storage service ${currentFolder.source} was null")
+            return null
+        }
+
+        return storageService
+    }
+
+    override fun onFileBrowserItemSelected(uri: Uri) {
+        val storageService = getStorageService("File upload failed") ?: return
+        val parentFolder = folderHistory.current!!
+        val mimeType = this.contentResolver.getType(uri)
+        val fileName = this.getFileNameFromUri(uri)
+        Log.d(TAG, fileName)
+
+        Toast.makeText(this, "Uploading file", Toast.LENGTH_SHORT).show()
+        Log.d(TAG, "Uploading file to ${parentFolder.name} folder (path=${uri.path} mime=$mimeType)")
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val inputStream = this@MainActivity.contentResolver.openInputStream(uri)
+            if (inputStream == null) {
+                Log.d(TAG, "Couldn't upload file. InputStream was null")
+                return@launch
+            }
+
+            val newFile = storageService.uploadFile(inputStream, mimeType.toString(), parentFolder.id, fileName)
+            if (newFile != null) {
+                this@MainActivity.adapter.add(newFile)
+                Log.d(TAG, "Uploaded file with name $fileName")
+            } else {
+                Log.d(TAG, "Couldn't upload file with name $fileName. Storage service returned null.")
+            }
+
+            withContext(Dispatchers.IO) {
+                inputStream.close()
+            }
+        }
+
+    }
+
+    private fun dropExtension(fileNameWithExtension: String): String {
+        val fileNameList = fileNameWithExtension.split(".").dropLast(1)
+        return fileNameList.joinToString(".")
+    }
+
+    private fun getFileNameFromUri(uri: Uri): String {
+        var fileNameWithExtension: String? = null
+
+        val cursor = contentResolver.query(uri, null, null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                fileNameWithExtension = it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+            }
+        }
+
+        if (fileNameWithExtension == null) {
+            fileNameWithExtension = uri.path?.split("/")?.last()
+        }
+        if (fileNameWithExtension == null) {
+            fileNameWithExtension = "Untitled"
+        }
+
+        return this.dropExtension(fileNameWithExtension!!)
     }
 }

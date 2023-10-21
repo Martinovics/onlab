@@ -1,5 +1,6 @@
 package com.onlab.oauth.models
 
+import com.google.api.services.drive.model.File
 import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.enums.ContentSource
 import com.onlab.oauth.interfaces.IStorageContent
@@ -9,6 +10,12 @@ class GoogleDriveContent(
     override val id: String,
     private val contentType: Any
 ) : IStorageContent {
+
+    constructor(file: File) : this(
+        name = file.name,
+        id = file.id,
+        contentType = file.mimeType
+    )
 
     override val source = ContentSource.GOOGLE_DRIVE
 

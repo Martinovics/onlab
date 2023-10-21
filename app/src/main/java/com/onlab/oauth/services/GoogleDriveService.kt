@@ -2,6 +2,7 @@ package com.onlab.oauth.services
 
 import android.util.Log
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
+import com.google.api.client.http.InputStreamContent
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.onlab.oauth.enums.ContentType
@@ -12,6 +13,7 @@ import com.onlab.oauth.models.GoogleDriveContent
 import com.onlab.oauth.models.StorageContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.InputStream
 import java.util.*
 
 
@@ -32,6 +34,17 @@ class GoogleDriveService(private val drive: Drive) : IStorageService {
                 Log.d(TAG, "Name: ${content.name} | ID: ${content.id} | Mime: ${content.type} | Source: ${content.source}")
             }
             contents
+        }
+    }
+
+    private fun fetchDirectoryById(directoryID: String): List<File>? {
+        return try {
+            val query = "'$directoryID' in parents and trashed=false"  // safe: it's not and sql querry
+            val result = drive.files().list().setQ(query).execute()
+            result.files ?: emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching files from Drive: ${e.localizedMessage}", e)
+            null
         }
     }
 
@@ -91,14 +104,28 @@ class GoogleDriveService(private val drive: Drive) : IStorageService {
         }
     }
 
-    private fun fetchDirectoryById(directoryID: String): List<File>? {
-        return try {
-            val query = "'$directoryID' in parents and trashed=false"  // safe: it's not and sql querry
-            val result = drive.files().list().setQ(query).execute()
-            result.files ?: emptyList()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error fetching files from Drive: ${e.localizedMessage}", e)
-            null
+    override suspend fun uploadFile(inputStream: InputStream, mimeType: String, parentFolderId: String, fileName: String): IStorageContent? {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Fájl metainformáció létrehozása
+                val fileMetadata = File().apply {
+                    name = fileName
+                    parents = Collections.singletonList(parentFolderId)
+                }
+
+                // A fájltartalom létrehozása
+                val mediaContent = InputStreamContent(mimeType, inputStream)
+
+                // Fájl feltöltése
+                val file = drive.files().create(fileMetadata, mediaContent)
+                    .setFields("id, name, mimeType")
+                    .execute()
+
+                file?.let { GoogleDriveContent(it) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error uploading file to Drive: ${e.localizedMessage}", e)
+                null
+            }
         }
     }
 }
