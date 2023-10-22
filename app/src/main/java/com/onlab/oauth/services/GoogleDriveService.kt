@@ -29,7 +29,7 @@ class GoogleDriveService(private val drive: Drive) : IStorageService {
             val contents = mutableListOf<IStorageContent>()
             val files = fetchDirectoryById(directoryID) ?: return@withContext null
             for (file in files) {
-                val content: IStorageContent = GoogleDriveContent(file.name, file.id, file.mimeType)
+                val content: IStorageContent = GoogleDriveContent(file)
                 contents.add(content)
                 Log.d(TAG, "Name: ${content.name} | ID: ${content.id} | Mime: ${content.type} | Source: ${content.source}")
             }
@@ -49,7 +49,7 @@ class GoogleDriveService(private val drive: Drive) : IStorageService {
     }
 
     override suspend fun getCustomRootFolder(): IStorageContent? {
-        val rootFolder = StorageContent("Root", "root", ContentType.DIRECTORY, ContentSource.GOOGLE_DRIVE)
+        val rootFolder = StorageContent("root", "Root", "", ContentType.DIRECTORY, ContentSource.GOOGLE_DRIVE)
 
         if (rootFolderPath.isEmpty()) {
             return rootFolder
@@ -86,7 +86,7 @@ class GoogleDriveService(private val drive: Drive) : IStorageService {
                 val directory = drive.files().create(fileMetadata)
                     .setFields("id, name, mimeType")
                     .execute()
-                directory?.let { GoogleDriveContent(it.name, it.id, it.mimeType) }
+                directory?.let { GoogleDriveContent(it) }
             } catch (ex: GoogleJsonResponseException) {
                 null
             }
@@ -104,24 +104,21 @@ class GoogleDriveService(private val drive: Drive) : IStorageService {
         }
     }
 
-    override suspend fun uploadFile(inputStream: InputStream, mimeType: String, parentFolderId: String, fileName: String): IStorageContent? {
-        return withContext(Dispatchers.IO) {
+    override suspend fun uploadFile(inputStream: InputStream, mimeType: String, parentFolderId: String, fileName: String, keyAlias: String): IStorageContent? = withContext(Dispatchers.IO) {
+        inputStream.use {
             try {
-                // Fájl metainformáció létrehozása
                 val fileMetadata = File().apply {
                     name = fileName
                     parents = Collections.singletonList(parentFolderId)
+                    properties = mapOf("keyAlias" to keyAlias)
                 }
+                val mediaContent = InputStreamContent(mimeType, it)
 
-                // A fájltartalom létrehozása
-                val mediaContent = InputStreamContent(mimeType, inputStream)
-
-                // Fájl feltöltése
                 val file = drive.files().create(fileMetadata, mediaContent)
-                    .setFields("id, name, mimeType")
+                    .setFields("id, name, mimeType, properties")
                     .execute()
 
-                file?.let { GoogleDriveContent(it) }
+                GoogleDriveContent(file)
             } catch (e: Exception) {
                 Log.e(TAG, "Error uploading file to Drive: ${e.localizedMessage}", e)
                 null

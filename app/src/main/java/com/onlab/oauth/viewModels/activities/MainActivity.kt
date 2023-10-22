@@ -1,18 +1,20 @@
 package com.onlab.oauth.viewModels.activities
 
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.api.services.drive.Drive
 import com.onlab.oauth.adapters.ContentBrowserAdapter
 import com.onlab.oauth.classes.ConnectionRepository
+import com.onlab.oauth.classes.EncryptionService
 import com.onlab.oauth.classes.FolderHistory
 import com.onlab.oauth.classes.StorageRepository
 import com.onlab.oauth.databinding.ActivityMainBinding
@@ -24,9 +26,10 @@ import com.onlab.oauth.services.GoogleDriveService
 import com.onlab.oauth.viewModels.fragments.AddContentBottomFragment
 import com.onlab.oauth.viewModels.fragments.ManageFileBottomFragment
 import kotlinx.coroutines.*
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
-import java.io.InputStream
+import java.util.*
 
 class MainActivity : AppCompatActivity(),
     IRecyclerItemClickedListener,
@@ -202,6 +205,7 @@ class MainActivity : AppCompatActivity(),
                 callback_success = {
                     drawerMenuItem.title = "Disconnect from ${connectionService.title}"
                     registerStorage(connectionService.source.toString(), connectionService.getCloudStorage())
+                    // todo list root folders
                     Log.d(TAG, "Connected to ${connectionService.title}")
                     Toast.makeText(this, "Connected to ${connectionService.title}", Toast.LENGTH_SHORT).show()
                 },
@@ -327,6 +331,7 @@ class MainActivity : AppCompatActivity(),
         return storageService
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     override fun onFileBrowserItemSelected(uri: Uri) {
         val storageService = getStorageService("File upload failed") ?: return
         val parentFolder = folderHistory.current!!
@@ -344,11 +349,23 @@ class MainActivity : AppCompatActivity(),
                 return@launch
             }
 
-            val newFile = storageService.uploadFile(inputStream, mimeType.toString(), parentFolder.id, fileName)
+            // encrypt
+            val keyAlias = UUID.randomUUID().toString()
+            val secretService = EncryptionService(keyAlias)  // mert még nincs folder id-nk
+            val (isEncrypted, encryptedBytes) = secretService.encrypt(inputStream)
+
+            if (!isEncrypted) {
+                Toast.makeText(this@MainActivity, "Encryption failed", Toast.LENGTH_SHORT).show()
+                Log.d(TAG, "Encryption failed (name=$fileName)")
+            }
+
+            val uploadInputStream = ByteArrayInputStream(encryptedBytes)
+            val newFile = storageService.uploadFile(uploadInputStream, mimeType.toString(), parentFolder.id, fileName, keyAlias)
             if (newFile != null) {
                 this@MainActivity.adapter.add(newFile)
                 Log.d(TAG, "Uploaded file with name $fileName")
             } else {
+                secretService.deleteAlias()
                 Log.d(TAG, "Couldn't upload file with name $fileName. Storage service returned null.")
             }
 
@@ -388,6 +405,7 @@ class MainActivity : AppCompatActivity(),
         Log.d(TAG, "onManageFileShareButtonClicked pos=$position")
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     override fun onManageFileDownloadButtonClicked(position: Int) {
         Log.d(TAG, "onManageFileDownloadButtonClicked pos=$position")
 
@@ -404,7 +422,17 @@ class MainActivity : AppCompatActivity(),
                 Log.d(TAG, "Downloading file failed (name=${content.name})")
                 return@launch
             }
-            val isSaved = saveFileToAppDir(inputStream, content.name)
+
+            // decrypt
+            val secretService = EncryptionService(content.keyAlias)
+            val (isDecrypted, decryptedBytes) = secretService.decrypt(inputStream)
+
+            if (!isDecrypted) {
+                Toast.makeText(this@MainActivity, "Decryption failed - Missing key", Toast.LENGTH_SHORT).show()
+                Log.d(TAG, "Decryption failed (name=${content.name}) - missing key ${content.id}")
+            }
+
+            val isSaved = saveFileToAppDir(decryptedBytes, content.name)
             if (isSaved) {
                 Toast.makeText(this@MainActivity, "Downloaded file", Toast.LENGTH_SHORT).show()
                 Log.d(TAG, "Downloaded file: ${content.name}. Saved to default app folder")
@@ -415,24 +443,20 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    private suspend fun saveFileToAppDir(inputStream: InputStream, fileName: String): Boolean {
-        return withContext(Dispatchers.IO) {
-            var success = true
-            val file = File(filesDir, fileName)
+    private suspend fun saveFileToAppDir(data: ByteArray, fileName: String): Boolean = withContext(Dispatchers.IO) {
+        var success = true
+        val file = File(filesDir, fileName)
 
-            try {
-                file.outputStream().use { outputStream ->
-                    inputStream.copyTo(outputStream)
-                }
-            } catch (e: IOException) {
-                e.printStackTrace()
-                success = false
-            } finally {
-                inputStream.close()
+        try {
+            file.outputStream().use { outputStream ->
+                outputStream.write(data)
             }
-
-            success
+        } catch (e: IOException) {
+            e.printStackTrace()
+            success = false
         }
+
+        return@withContext success
     }
 
     override fun onManageFileManageKeyButtonClicked(position: Int) {

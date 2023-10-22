@@ -8,6 +8,6 @@ interface IStorageService {
     suspend fun getCustomRootFolder(): IStorageContent?
     suspend fun createDir(parentDirectoryId: String, directoryName: String): IStorageContent?
     suspend fun removeContent(contentId: String): Boolean
-    suspend fun uploadFile(inputStream: InputStream, mimeType: String, parentFolderId: String, fileName: String): IStorageContent?
+    suspend fun uploadFile(inputStream: InputStream, mimeType: String, parentFolderId: String, fileName: String, keyAlias: String): IStorageContent?
     suspend fun downloadFile(fileId: String): InputStream?
 }

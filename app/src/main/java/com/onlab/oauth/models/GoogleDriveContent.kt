@@ -1,19 +1,23 @@
 package com.onlab.oauth.models
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import com.google.api.services.drive.model.File
 import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.enums.ContentSource
 import com.onlab.oauth.interfaces.IStorageContent
 
 class GoogleDriveContent(
-    override val name: String,
     override val id: String,
+    override val name: String,
+    override val keyAlias: String,
     private val contentType: Any
 ) : IStorageContent {
 
     constructor(file: File) : this(
-        name = file.name,  // with extension if there's any
         id = file.id,
+        name = file.name,  // with extension if there's any
+        keyAlias = file.properties?.get("keyAlias") ?: "",
         contentType = file.mimeType
     )
 
@@ -37,4 +41,6 @@ class GoogleDriveContent(
     override fun toString(): String {
         return "name=$name | id=$id | contentType=$contentType | source=$source"
     }
+
+
 }
