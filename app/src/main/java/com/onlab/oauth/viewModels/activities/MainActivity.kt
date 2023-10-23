@@ -11,18 +11,15 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.api.services.drive.Drive
 import com.onlab.oauth.adapters.ContentBrowserAdapter
 import com.onlab.oauth.classes.ConnectionRepository
 import com.onlab.oauth.classes.EncryptionService
 import com.onlab.oauth.classes.FolderHistory
-import com.onlab.oauth.classes.StorageRepository
 import com.onlab.oauth.databinding.ActivityMainBinding
 import com.onlab.oauth.enums.ContentSource
 import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.interfaces.*
 import com.onlab.oauth.services.GoogleConnectionService
-import com.onlab.oauth.services.GoogleDriveService
 import com.onlab.oauth.viewModels.fragments.AddContentBottomFragment
 import com.onlab.oauth.viewModels.fragments.ManageFileBottomFragment
 import kotlinx.coroutines.*
@@ -39,7 +36,7 @@ class MainActivity : AppCompatActivity(),
 
     private var TAG = this::class.java.simpleName
     private lateinit var binding: ActivityMainBinding
-    private lateinit var adapter: ContentBrowserAdapter
+    private lateinit var contentList: ContentBrowserAdapter
     private val folderHistory = FolderHistory()
 
 
@@ -96,53 +93,30 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun initStorages() {
-        for (kv in ConnectionRepository.registeredEntries) {
-            val key = kv.key
-            val connectionService = kv.value
-
-            if (connectionService.isLoggedIn()) {
-                val storageService = connectionService.getCloudStorage()
-                registerStorage(key, storageService)
-            }
-
-        }
         listRegisteredStorageRootFolders()
     }
 
-    private fun registerStorage(key: String, storageService: Any) {
-        // register storage services here ==========
-        when (key) {
-            ContentSource.GOOGLE_DRIVE.toString() ->
-                StorageRepository.register(key, GoogleDriveService(storageService as Drive))
-            else ->
-                throw Exception("Unknown storage service: $key")
-        }
-    }
+    private fun listRegisteredStorageRootFolders() = CoroutineScope(Dispatchers.Main).launch {
+        this@MainActivity.binding.toolbar.tvCurrentFolder.text = "Roots"
+        this@MainActivity.contentList.clear()
 
-    private fun listRegisteredStorageRootFolders() {
-        this.binding.toolbar.tvCurrentFolder.text = "roots"
-        this.adapter.clear()
+        for ((connectionKey, connectionService) in ConnectionRepository.registeredEntries) {
+            val storageService = connectionService.getStorage() ?: continue
 
-        for (kv in StorageRepository.registeredEntries) {
-            val storageKey = kv.key
-            val storageService = kv.value
-
-            CoroutineScope(Dispatchers.Main).launch {
-                val rootFolder = storageService.getCustomRootFolder()
-                if (rootFolder == null) {
-                    Log.d(TAG,"Couldn't not get root folder for $storageKey")
-                    return@launch
-                }
-
-                val contents = storageService.listDir(rootFolder.id)
-                if (contents == null) {
-                    Log.d(TAG,"Couldn't list contents of folder ${rootFolder.name}")
-                    return@launch
-                }
-                this@MainActivity.adapter.addRange(contents)
-                Log.d(TAG, "Listed ${contents.size} root folders from $storageKey")
-                contents.forEach { content -> Log.d(TAG, "\t${content.name} (${content.id})") }
+            val rootFolder = storageService.getCustomRootFolder()
+            if (rootFolder == null) {
+                Log.d(TAG,"Couldn't not get root folder for $connectionKey")
+                return@launch
             }
+
+            val contents = storageService.listDir(rootFolder.id)
+            if (contents == null) {
+                Log.d(TAG,"Couldn't list contents of folder ${rootFolder.name}")
+                return@launch
+            }
+            this@MainActivity.contentList.addRange(contents)
+            Log.d(TAG, "Listed ${contents.size} root folders from $connectionKey")
+            contents.forEach { content -> Log.d(TAG, "\t${content.name} (${content.id})") }
         }
     }
 
@@ -154,8 +128,8 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun initRecycleView() {
-        this.adapter = ContentBrowserAdapter(this)
-        this.binding.rvContents.adapter = this.adapter
+        this.contentList = ContentBrowserAdapter(this)
+        this.binding.rvContents.adapter = this.contentList
         this.binding.rvContents.layoutManager = LinearLayoutManager(this)
     }
 
@@ -191,7 +165,6 @@ class MainActivity : AppCompatActivity(),
             connectionService.signOut(
                 callback_success = {
                     drawerMenuItem.title = "Connect to ${connectionService.title}"
-                    StorageRepository.remove(connectionService.source.toString())
                     Log.i(TAG, "Disconnected from ${connectionService.title}")
                     Toast.makeText(this, "Disconnected from ${connectionService.title}", Toast.LENGTH_SHORT).show()
                 },
@@ -204,7 +177,6 @@ class MainActivity : AppCompatActivity(),
             connectionService.signIn(
                 callback_success = {
                     drawerMenuItem.title = "Disconnect from ${connectionService.title}"
-                    registerStorage(connectionService.source.toString(), connectionService.getCloudStorage())
                     // todo list root folders
                     Log.d(TAG, "Connected to ${connectionService.title}")
                     Toast.makeText(this, "Connected to ${connectionService.title}", Toast.LENGTH_SHORT).show()
@@ -222,7 +194,7 @@ class MainActivity : AppCompatActivity(),
             return
         }
 
-        val storageService = StorageRepository.get(content.source.toString())
+        val storageService = ConnectionRepository.get(content.source.toString())?.getStorage()
         if (storageService == null) {
             Toast.makeText(this, "Connection error. Try to reconnect to ${content.source}", Toast.LENGTH_SHORT).show()
             Log.d(TAG, "Couldn't get storage service. Storage service ${content.source} was null")
@@ -231,7 +203,7 @@ class MainActivity : AppCompatActivity(),
 
         this.binding.toolbar.tvCurrentFolder.text = content.name
         this.folderHistory.add(content)
-        this.adapter.clear()
+        this.contentList.clear()
 
         CoroutineScope(Dispatchers.Main).launch {
             val contents = storageService.listDir(content.id)
@@ -239,7 +211,7 @@ class MainActivity : AppCompatActivity(),
                 Log.d(TAG,"Couldn't list contents of folder ${content.name}")
                 return@launch
             }
-            this@MainActivity.adapter.addRange(contents)
+            this@MainActivity.contentList.addRange(contents)
             Log.d(TAG, "Listed ${contents.size} contents from ${content.source}")
             contents.forEach { content -> Log.d(TAG, "\t${content.name} (${content.id})") }
         }
@@ -247,15 +219,15 @@ class MainActivity : AppCompatActivity(),
 
     override fun onItemClicked(position: Int) {
         this.binding.toolbar.btnRemove.visibility = View.GONE
-        navigateToFolder(this.adapter.getItemAt(position))
+        navigateToFolder(this.contentList.getItemAt(position))
     }
 
     override fun onItemLongClicked(position: Int): Boolean {
         this.binding.toolbar.btnRemove.visibility = View.VISIBLE
 
-        val content = this.adapter.getItemAt(position)
+        val content = this.contentList.getItemAt(position)
 
-        val storageService = StorageRepository.get(content.source.toString())
+        val storageService = ConnectionRepository.get(content.source.toString())?.getStorage()
         if (storageService == null) {
             Log.d(TAG, "Couldn't get storage service. Storage service ${content.source} was null")
             return true
@@ -264,7 +236,7 @@ class MainActivity : AppCompatActivity(),
         this.binding.toolbar.btnRemove.setOnClickListener {
             CoroutineScope(Dispatchers.Main).launch {
                 if (storageService.removeContent(content.id)) {
-                    this@MainActivity.adapter.removeAt(position)
+                    this@MainActivity.contentList.removeAt(position)
                     this@MainActivity.binding.toolbar.btnRemove.visibility = View.GONE
 
                     Toast.makeText(this@MainActivity, "Removed ${content.name}", Toast.LENGTH_SHORT).show()
@@ -292,7 +264,7 @@ class MainActivity : AppCompatActivity(),
             return
         }
 
-        val storageService = StorageRepository.get(currentFolder.source.toString())
+        val storageService = ConnectionRepository.get(currentFolder.source.toString())?.getStorage()
         if (storageService == null) {
             Toast.makeText(this, "Couldn't create folder", Toast.LENGTH_SHORT).show()
             Log.d(TAG, "Couldn't get storage service. Storage service ${currentFolder.source} was null")
@@ -302,7 +274,7 @@ class MainActivity : AppCompatActivity(),
         CoroutineScope(Dispatchers.Main).launch {
             val newDirectory = storageService.createDir(currentFolder.id, directoryName)
             if (newDirectory != null) {
-                this@MainActivity.adapter.add(newDirectory)
+                this@MainActivity.contentList.add(newDirectory)
                 Log.d(TAG, "Created folder with name ${newDirectory.name}")
             } else {
                 Log.d(TAG, "Couldn't create folder. Storage service returned null.")
@@ -321,7 +293,7 @@ class MainActivity : AppCompatActivity(),
             return null
         }
 
-        val storageService = StorageRepository.get(currentFolder.source.toString())
+        val storageService = ConnectionRepository.get(currentFolder.source.toString())?.getStorage()
         if (storageService == null) {
             Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show()
             Log.d(TAG, "Couldn't get storage service. Storage service ${currentFolder.source} was null")
@@ -362,7 +334,7 @@ class MainActivity : AppCompatActivity(),
             val uploadInputStream = ByteArrayInputStream(encryptedBytes)
             val newFile = storageService.uploadFile(uploadInputStream, mimeType.toString(), parentFolder.id, fileName, keyAlias)
             if (newFile != null) {
-                this@MainActivity.adapter.add(newFile)
+                this@MainActivity.contentList.add(newFile)
                 Log.d(TAG, "Uploaded file with name $fileName")
             } else {
                 secretService.deleteAlias()
@@ -374,11 +346,6 @@ class MainActivity : AppCompatActivity(),
             }
         }
 
-    }
-
-    private fun dropExtension(fileNameWithExtension: String): String {
-        val fileNameList = fileNameWithExtension.split(".").dropLast(1)
-        return fileNameList.joinToString(".")
     }
 
     private fun getFileNameFromUri(uri: Uri): String {
@@ -410,7 +377,7 @@ class MainActivity : AppCompatActivity(),
         Log.d(TAG, "onManageFileDownloadButtonClicked pos=$position")
 
         val storageService = getStorageService("Couldn't download file") ?: return
-        val content = this.adapter.getItemAt(position)
+        val content = this.contentList.getItemAt(position)
 
         Toast.makeText(this, "Downloading file", Toast.LENGTH_SHORT).show()
         Log.d(TAG, "Downloading file (name=${content.name})")

@@ -12,6 +12,7 @@ import com.onlab.oauth.R
 import com.onlab.oauth.classes.GoogleHelper
 import com.onlab.oauth.enums.ContentSource
 import com.onlab.oauth.interfaces.IConnectionService
+import com.onlab.oauth.interfaces.IStorageService
 
 
 class GoogleConnectionService(private val activity: AppCompatActivity) : IConnectionService {
@@ -75,7 +76,8 @@ class GoogleConnectionService(private val activity: AppCompatActivity) : IConnec
         }
     }
 
-    override fun getCloudStorage(): Any {
-        return helper.getDriveService()
+    override fun getStorage(): IStorageService? {
+        val drive = helper.getDriveService() ?: return null
+        return GoogleDriveService(drive)
     }
 }

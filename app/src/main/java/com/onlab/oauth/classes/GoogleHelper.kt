@@ -38,9 +38,8 @@ class GoogleHelper(private val activity: Activity) {
         return this.getLastSignedInAccount() != null
     }
 
-    fun getDriveService(): Drive {
-        val account = this.getLastSignedInAccount()
-            ?: throw java.lang.Exception("Account was null. Sign in first.")
+    fun getDriveService(): Drive? {
+        val account = this.getLastSignedInAccount() ?: return null
 
         val credential = GoogleAccountCredential.usingOAuth2(
             this.activity, listOf(DriveScopes.DRIVE_FILE)
