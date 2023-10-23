@@ -1,5 +1,6 @@
 package com.onlab.oauth.viewModels.activities
 
+import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -20,6 +21,7 @@ import com.onlab.oauth.enums.ContentSource
 import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.interfaces.*
 import com.onlab.oauth.services.GoogleConnectionService
+import com.onlab.oauth.viewModels.DrawerMenuViewModel
 import com.onlab.oauth.viewModels.fragments.AddContentBottomFragment
 import com.onlab.oauth.viewModels.fragments.ManageFileBottomFragment
 import kotlinx.coroutines.*
@@ -27,38 +29,55 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
 import java.util.*
+import androidx.activity.viewModels
 
-class MainActivity : AppCompatActivity(),
+class MainActivity : AppCompatActivity(), IMainActivityUIManager,
     IRecyclerItemClickedListener,
     IAddContentBottomFragmentListener,
     IManageFileBottomFragmentListener
 {
 
     private var TAG = this::class.java.simpleName
-    private lateinit var binding: ActivityMainBinding
-    private lateinit var contentList: ContentBrowserAdapter
+    private lateinit var _binding: ActivityMainBinding
+    private lateinit var _contentList: ContentBrowserAdapter
     private val folderHistory = FolderHistory()
+
+    private val drawerMenuViewModel: DrawerMenuViewModel by viewModels { DrawerMenuViewModel.createFactory(this) }
+
+
+    override val binding: ActivityMainBinding
+        get() {
+            return _binding
+        }
+
+    override val contentList: ContentBrowserAdapter
+        get() {
+            return _contentList
+        }
+
+    override fun makeToast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        this.binding = ActivityMainBinding.inflate(layoutInflater)
+        _binding = ActivityMainBinding.inflate(layoutInflater)
 
         // order matters
         initToolbar()
         initRecycleView()
         initAddContentBottomFragment()
         initConnections()
-        initNavigationView()
+        drawerMenuViewModel.init()
         initStorages()
     }
 
 
+    @SuppressLint("MissingSuperCall")
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // when drawer is opened -> close
-        if (this.binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            this.binding.drawerLayout.closeDrawer(GravityCompat.START)
+        if (drawerMenuViewModel.closeDrawer()) {
             return
         }
 
@@ -76,14 +95,14 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun initToolbar() {
-        setContentView(this.binding.root)
+        setContentView(_binding.root)
         setSupportActionBar(binding.toolbar.root)
         supportActionBar?.title = ""
-        this.binding.toolbar.btnHamburgerMenu.setOnClickListener {
-            this.binding.drawerLayout.openDrawer(GravityCompat.START)
+        _binding.toolbar.btnHamburgerMenu.setOnClickListener {
+            _binding.drawerLayout.openDrawer(GravityCompat.START)
         }
-        this.binding.toolbar.btnRemove.setOnClickListener {
-            this.binding.toolbar.btnRemove.visibility = View.GONE
+        _binding.toolbar.btnRemove.setOnClickListener {
+            _binding.toolbar.btnRemove.visibility = View.GONE
         }
     }
 
@@ -121,73 +140,18 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun initAddContentBottomFragment() {
-        this.binding.btnAddContent.setOnClickListener {
+        _binding.btnAddContent.setOnClickListener {
             val bottomSheet = AddContentBottomFragment(this)
             bottomSheet.show(supportFragmentManager, bottomSheet.tag)
         }
     }
 
     private fun initRecycleView() {
-        this.contentList = ContentBrowserAdapter(this)
-        this.binding.rvContents.adapter = this.contentList
-        this.binding.rvContents.layoutManager = LinearLayoutManager(this)
+        _contentList = ContentBrowserAdapter(this)
+        _binding.rvContents.adapter = contentList
+        _binding.rvContents.layoutManager = LinearLayoutManager(this)
     }
 
-    private fun initNavigationView() {
-
-        // set drawer menu connection titles
-        for (kv in ConnectionRepository.registeredEntries) {
-            val connectionService = kv.value
-            val drawerMenuItem = this.binding.drawerMenu.menu.findItem(connectionService.menuItemId)
-            if (connectionService.isLoggedIn()) {
-                drawerMenuItem.title = "Disconnect ${connectionService.title}"
-            } else {
-                drawerMenuItem.title = "Connect ${connectionService.title}"
-            }
-        }
-
-        this.binding.drawerMenu.setNavigationItemSelectedListener { menuItem ->
-            var setListener = false
-            for (kv in ConnectionRepository.registeredEntries) {
-                val connectionService = kv.value
-                if (connectionService.menuItemId == menuItem.itemId) {
-                    connectionDrawerMenuListener(connectionService)
-                    setListener = true
-                }
-            }
-            setListener
-        }
-    }
-
-    private fun connectionDrawerMenuListener(connectionService: IConnectionService) {
-        val drawerMenuItem = this.binding.drawerMenu.menu.findItem(connectionService.menuItemId)
-        if (connectionService.isLoggedIn()) {
-            connectionService.signOut(
-                callback_success = {
-                    drawerMenuItem.title = "Connect to ${connectionService.title}"
-                    Log.i(TAG, "Disconnected from ${connectionService.title}")
-                    Toast.makeText(this, "Disconnected from ${connectionService.title}", Toast.LENGTH_SHORT).show()
-                },
-                callback_fail = {
-                    Log.e(TAG, "Disconnected from ${connectionService.title} failed")
-                    Toast.makeText(this, "Disconnect failed", Toast.LENGTH_SHORT).show()
-                }
-            )
-        } else {
-            connectionService.signIn(
-                callback_success = {
-                    drawerMenuItem.title = "Disconnect from ${connectionService.title}"
-                    // todo list root folders
-                    Log.d(TAG, "Connected to ${connectionService.title}")
-                    Toast.makeText(this, "Connected to ${connectionService.title}", Toast.LENGTH_SHORT).show()
-                },
-                callback_fail = {
-                    Log.e(TAG, "Connection to ${connectionService.title} failed")
-                    Toast.makeText(this, "Connection failed", Toast.LENGTH_SHORT).show()
-                }
-            )
-        }
-    }
 
     private fun navigateToFolder(content: IStorageContent) {
         if (content.type != ContentType.DIRECTORY) {
@@ -201,9 +165,9 @@ class MainActivity : AppCompatActivity(),
             return
         }
 
-        this.binding.toolbar.tvCurrentFolder.text = content.name
+        _binding.toolbar.tvCurrentFolder.text = content.name
         this.folderHistory.add(content)
-        this.contentList.clear()
+        contentList.clear()
 
         CoroutineScope(Dispatchers.Main).launch {
             val contents = storageService.listDir(content.id)
@@ -217,13 +181,17 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
+
+
+    //region ContentListViewModel
+
     override fun onItemClicked(position: Int) {
-        this.binding.toolbar.btnRemove.visibility = View.GONE
+        _binding.toolbar.btnRemove.visibility = View.GONE
         navigateToFolder(this.contentList.getItemAt(position))
     }
 
     override fun onItemLongClicked(position: Int): Boolean {
-        this.binding.toolbar.btnRemove.visibility = View.VISIBLE
+        _binding.toolbar.btnRemove.visibility = View.VISIBLE
 
         val content = this.contentList.getItemAt(position)
 
@@ -233,7 +201,7 @@ class MainActivity : AppCompatActivity(),
             return true
         }
 
-        this.binding.toolbar.btnRemove.setOnClickListener {
+        _binding.toolbar.btnRemove.setOnClickListener {
             CoroutineScope(Dispatchers.Main).launch {
                 if (storageService.removeContent(content.id)) {
                     this@MainActivity.contentList.removeAt(position)
@@ -255,6 +223,11 @@ class MainActivity : AppCompatActivity(),
         val bottomSheet = ManageFileBottomFragment(this, position)
         bottomSheet.show(supportFragmentManager, bottomSheet.tag)
     }
+
+    //endregion
+
+
+
 
     override fun onAddDirectoryDialogPositiveClicked(directoryName: String) {
         val currentFolder = this.folderHistory.current
