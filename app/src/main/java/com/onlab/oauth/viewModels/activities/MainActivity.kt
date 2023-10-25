@@ -31,7 +31,8 @@ import java.io.IOException
 import java.util.*
 import androidx.activity.viewModels
 
-class MainActivity : AppCompatActivity(), IMainActivityUIManager,
+
+class MainActivity : AppCompatActivity(),
     IRecyclerItemClickedListener,
     IAddContentBottomFragmentListener,
     IManageFileBottomFragmentListener
@@ -42,23 +43,18 @@ class MainActivity : AppCompatActivity(), IMainActivityUIManager,
     private lateinit var _contentList: ContentBrowserAdapter
     private val folderHistory = FolderHistory()
 
-    private val drawerMenuViewModel: DrawerMenuViewModel by viewModels { DrawerMenuViewModel.createFactory(this) }
+    private val drawerMenuViewModel: DrawerMenuViewModel by viewModels { DrawerMenuViewModel.createFactory() }
 
 
-    override val binding: ActivityMainBinding
+    val binding: ActivityMainBinding  // todo remove
         get() {
             return _binding
         }
 
-    override val contentList: ContentBrowserAdapter
+    val contentList: ContentBrowserAdapter  // todo remove
         get() {
             return _contentList
         }
-
-    override fun makeToast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,15 +65,39 @@ class MainActivity : AppCompatActivity(), IMainActivityUIManager,
         initRecycleView()
         initAddContentBottomFragment()
         initConnections()
-        drawerMenuViewModel.init()
+        initDrawerViewModel()
         initStorages()
+    }
+
+    private fun initDrawerViewModel() {
+        drawerMenuViewModel.connectionTitles.observe(this) { titles ->
+            titles.forEach { (itemId, title) ->
+                binding.drawerMenu.menu.findItem(itemId)?.title = title
+            }
+        }
+
+        drawerMenuViewModel.showToastMessage.observe(this) { message ->
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+
+        drawerMenuViewModel.closeDrawerEvent.observe(this) {
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        }
+
+        binding.drawerMenu.setNavigationItemSelectedListener { menuItem ->
+            drawerMenuViewModel.onMenuItemSelected(menuItem.itemId)
+            true
+        }
+
+        drawerMenuViewModel.init()
     }
 
 
     @SuppressLint("MissingSuperCall")
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (drawerMenuViewModel.closeDrawer()) {
+        if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            drawerMenuViewModel.closeDrawer()
             return
         }
 
