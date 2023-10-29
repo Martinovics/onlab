@@ -4,6 +4,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.onlab.oauth.classes.ConnectionRepository
+import com.onlab.oauth.interfaces.ICallback
 import com.onlab.oauth.interfaces.IConnectionService
 
 
@@ -54,25 +55,27 @@ class DrawerMenuViewModel: ViewModel() {
     private fun connectionDrawerMenuListener(connectionService: IConnectionService) {
         if (connectionService.isLoggedIn()) {
             connectionService.signOut(
-                callback_success = {
-                    updateNavigationMenuItemTitles()
-                    showToastMessage.value = "Disconnected from ${connectionService.title}"
-                },
-                callback_fail = {
-                    showToastMessage.value = "Disconnect failed"
-                }
-            )
+                object : ICallback {
+                    override fun onSuccess() {
+                        updateNavigationMenuItemTitles()
+                        showToastMessage.value = "Disconnected from ${connectionService.title}"
+                    }
+                    override fun onFailure() {
+                        showToastMessage.value = "Disconnect failed"
+                    }
+                })
         } else {
             connectionService.signIn(
-                callback_success = {
-                    updateNavigationMenuItemTitles()
-                    // todo list root folder
-                    showToastMessage.value = "Connected to ${connectionService.title}"
-                },
-                callback_fail = {
-                    showToastMessage.value = "Connection failed"
-                }
-            )
+                object : ICallback {
+                    override fun onSuccess() {
+                        updateNavigationMenuItemTitles()
+                        // todo list root folder
+                        showToastMessage.value = "Connected to ${connectionService.title}"
+                    }
+                    override fun onFailure() {
+                        showToastMessage.value = "Disconnect failed"
+                    }
+                })
         }
     }
 

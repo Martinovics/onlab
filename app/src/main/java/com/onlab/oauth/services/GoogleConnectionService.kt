@@ -11,6 +11,7 @@ import com.google.android.gms.tasks.Task
 import com.onlab.oauth.R
 import com.onlab.oauth.classes.GoogleHelper
 import com.onlab.oauth.enums.ContentSource
+import com.onlab.oauth.interfaces.ICallback
 import com.onlab.oauth.interfaces.IConnectionService
 import com.onlab.oauth.interfaces.IStorageService
 
@@ -21,8 +22,7 @@ class GoogleConnectionService(private val activity: AppCompatActivity) : IConnec
     private val helper: GoogleHelper = GoogleHelper(activity)
     private val gsc = helper.getSignInClient()
 
-    private var loginCallbackSuccess: (() -> Unit)? = null
-    private var logoutCallbackFail: (() -> Unit)? = null
+    private lateinit var loginCallback: ICallback
     private val signInLauncher = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             handleSignIn(result.data)
@@ -42,9 +42,8 @@ class GoogleConnectionService(private val activity: AppCompatActivity) : IConnec
         return helper.isLoggedIn()
     }
 
-    override fun signIn(callback_success: (() -> Unit)?, callback_fail: (() -> Unit)?) {
-        this.loginCallbackSuccess = callback_success
-        this.logoutCallbackFail = callback_fail
+    override fun signIn(callback: ICallback) {
+        this.loginCallback = callback
         this.signInLauncher.launch(this.gsc.signInIntent)
     }
 
@@ -53,26 +52,26 @@ class GoogleConnectionService(private val activity: AppCompatActivity) : IConnec
         try {
             val account = task.getResult(ApiException::class.java)
             Log.d(tag, "Logged to google as ${account.displayName}")
-            this.loginCallbackSuccess?.invoke()
+            loginCallback.onSuccess()
         } catch (e: ApiException) {
             Log.w(tag, "Failed to login to google: err=" + e.statusCode)
-            this.logoutCallbackFail?.invoke()
+            loginCallback.onFailure()
         }
     }
 
-    override fun signOut(callback_success: (() -> Unit)?, callback_fail: (() -> Unit)?) {
+    override fun signOut(callback: ICallback) {
         this.gsc.signOut().addOnCompleteListener(activity) { task ->
-            this.handleSignOut(task, callback_success, callback_fail)
+            this.handleSignOut(task, callback)
         }
     }
 
-    private fun handleSignOut(task: Task<Void>, callback_success: (() -> Unit)?, callback_fail: (() -> Unit)?) {
+    private fun handleSignOut(task: Task<Void>, callback: ICallback) {
         if (task.isSuccessful) {
             Log.d(tag, "Signed-out from google")
-            callback_success?.invoke()
+            callback.onSuccess()
         } else {
             Log.w(tag, "Sign-out from google failed")
-            callback_fail?.invoke()
+            callback.onFailure()
         }
     }
 

@@ -7,7 +7,7 @@ interface IConnectionService {
     val menuItemId: Int
     val source: ContentSource
     fun isLoggedIn(): Boolean
-    fun signIn(callback_success: (() -> Unit)?, callback_fail: (() -> Unit)?)
-    fun signOut(callback_success: (() -> Unit)?, callback_fail: (() -> Unit)?)
+    fun signIn(callback: ICallback)
+    fun signOut(callback: ICallback)
     fun getStorage(): IStorageService?
 }
