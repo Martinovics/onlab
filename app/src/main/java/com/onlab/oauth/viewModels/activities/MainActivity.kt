@@ -30,10 +30,10 @@ import java.io.File
 import java.io.IOException
 import java.util.*
 import androidx.activity.viewModels
+import com.onlab.oauth.viewModels.ContentBrowserViewModel
 
 
 class MainActivity : AppCompatActivity(),
-    IRecyclerItemClickedListener,
     IAddContentBottomFragmentListener,
     IManageFileBottomFragmentListener
 {
@@ -44,6 +44,7 @@ class MainActivity : AppCompatActivity(),
     private val folderHistory = FolderHistory()
 
     private val drawerMenuViewModel: DrawerMenuViewModel by viewModels { DrawerMenuViewModel.createFactory() }
+    private val contentBrowserViewModel: ContentBrowserViewModel by viewModels { ContentBrowserViewModel.createFactory() }
 
 
     val binding: ActivityMainBinding  // todo remove
@@ -66,7 +67,8 @@ class MainActivity : AppCompatActivity(),
         initAddContentBottomFragment()
         initConnections()
         initDrawerViewModel()
-        initStorages()
+        initContentBrowserViewModel()
+        // initStorages()
     }
 
     private fun initDrawerViewModel() {
@@ -92,6 +94,26 @@ class MainActivity : AppCompatActivity(),
         drawerMenuViewModel.init()
     }
 
+    private fun initContentBrowserViewModel() {
+        contentBrowserViewModel.removeButtonVisibility.observe(this) { visibility ->
+            binding.toolbar.btnRemove.visibility = visibility
+        }
+        contentBrowserViewModel.toastMessage.observe(this) { message ->
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+        contentBrowserViewModel.toolbarCurrentFolderText.observe(this) { text ->
+            binding.toolbar.tvCurrentFolder.text = text
+        }
+
+        contentBrowserViewModel.onItemLongClicked.observe(this) { position ->
+            binding.toolbar.btnRemove.setOnClickListener {
+                contentBrowserViewModel.onItemLongClickedHandler(position)
+            }
+        }
+
+        contentBrowserViewModel.init()
+    }
+
 
     @SuppressLint("MissingSuperCall")
     @Deprecated("Deprecated in Java")
@@ -101,13 +123,7 @@ class MainActivity : AppCompatActivity(),
             return
         }
 
-        // navigate in the folder history
-        if (folderHistory.size == 1) {  // load roots
-            this.folderHistory.removeLast()
-            listRegisteredStorageRootFolders()
-            return
-        } else if (1 < folderHistory.size) {  // go to previous folder
-            navigateToFolder(folderHistory.previous!!)
+        if (contentBrowserViewModel.navigateBack()) {
             return
         }
 
@@ -131,34 +147,6 @@ class MainActivity : AppCompatActivity(),
         ConnectionRepository.register(ContentSource.GOOGLE_DRIVE.toString(), GoogleConnectionService(this))
     }
 
-    private fun initStorages() {
-        listRegisteredStorageRootFolders()
-    }
-
-    private fun listRegisteredStorageRootFolders() = CoroutineScope(Dispatchers.Main).launch {
-        this@MainActivity.binding.toolbar.tvCurrentFolder.text = "Roots"
-        this@MainActivity.contentList.clear()
-
-        for ((connectionKey, connectionService) in ConnectionRepository.registeredEntries) {
-            val storageService = connectionService.getStorage() ?: continue
-
-            val rootFolder = storageService.getCustomRootFolder()
-            if (rootFolder == null) {
-                Log.d(TAG,"Couldn't not get root folder for $connectionKey")
-                return@launch
-            }
-
-            val contents = storageService.listDir(rootFolder.id)
-            if (contents == null) {
-                Log.d(TAG,"Couldn't list contents of folder ${rootFolder.name}")
-                return@launch
-            }
-            this@MainActivity.contentList.addRange(contents)
-            Log.d(TAG, "Listed ${contents.size} root folders from $connectionKey")
-            contents.forEach { content -> Log.d(TAG, "\t${content.name} (${content.id})") }
-        }
-    }
-
     private fun initAddContentBottomFragment() {
         _binding.btnAddContent.setOnClickListener {
             val bottomSheet = AddContentBottomFragment(this)
@@ -167,86 +155,10 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun initRecycleView() {
-        _contentList = ContentBrowserAdapter(this)
+        _contentList = contentBrowserViewModel.contentList
         _binding.rvContents.adapter = contentList
         _binding.rvContents.layoutManager = LinearLayoutManager(this)
     }
-
-
-    private fun navigateToFolder(content: IStorageContent) {
-        if (content.type != ContentType.DIRECTORY) {
-            return
-        }
-
-        val storageService = ConnectionRepository.get(content.source.toString())?.getStorage()
-        if (storageService == null) {
-            Toast.makeText(this, "Connection error. Try to reconnect to ${content.source}", Toast.LENGTH_SHORT).show()
-            Log.d(TAG, "Couldn't get storage service. Storage service ${content.source} was null")
-            return
-        }
-
-        _binding.toolbar.tvCurrentFolder.text = content.name
-        this.folderHistory.add(content)
-        contentList.clear()
-
-        CoroutineScope(Dispatchers.Main).launch {
-            val contents = storageService.listDir(content.id)
-            if (contents == null) {
-                Log.d(TAG,"Couldn't list contents of folder ${content.name}")
-                return@launch
-            }
-            this@MainActivity.contentList.addRange(contents)
-            Log.d(TAG, "Listed ${contents.size} contents from ${content.source}")
-            contents.forEach { content -> Log.d(TAG, "\t${content.name} (${content.id})") }
-        }
-    }
-
-
-
-    //region ContentListViewModel
-
-    override fun onItemClicked(position: Int) {
-        _binding.toolbar.btnRemove.visibility = View.GONE
-        navigateToFolder(this.contentList.getItemAt(position))
-    }
-
-    override fun onItemLongClicked(position: Int): Boolean {
-        _binding.toolbar.btnRemove.visibility = View.VISIBLE
-
-        val content = this.contentList.getItemAt(position)
-
-        val storageService = ConnectionRepository.get(content.source.toString())?.getStorage()
-        if (storageService == null) {
-            Log.d(TAG, "Couldn't get storage service. Storage service ${content.source} was null")
-            return true
-        }
-
-        _binding.toolbar.btnRemove.setOnClickListener {
-            CoroutineScope(Dispatchers.Main).launch {
-                if (storageService.removeContent(content.id)) {
-                    this@MainActivity.contentList.removeAt(position)
-                    this@MainActivity.binding.toolbar.btnRemove.visibility = View.GONE
-
-                    Toast.makeText(this@MainActivity, "Removed ${content.name}", Toast.LENGTH_SHORT).show()
-                    Log.d(TAG, "Removed content with name: ${content.name}")
-                } else {
-                    Toast.makeText(this@MainActivity, "Couldn't remove ${content.name}", Toast.LENGTH_SHORT).show()
-                    Log.d(TAG, "Couldn't remove content with name: ${content.name}")
-                }
-            }
-        }
-        return true
-    }
-
-    override fun onMoreClicked(position: Int) {
-        Log.d(TAG, "onMoreClicked at pos=$position")
-        val bottomSheet = ManageFileBottomFragment(this, position)
-        bottomSheet.show(supportFragmentManager, bottomSheet.tag)
-    }
-
-    //endregion
-
-
 
 
     override fun onAddDirectoryDialogPositiveClicked(directoryName: String) {
