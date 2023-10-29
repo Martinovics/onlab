@@ -10,8 +10,12 @@ import com.onlab.oauth.interfaces.IConnectionService
 
 class DrawerMenuViewModel: ViewModel() {
 
+    val connectionTitles = MutableLiveData<Map<Int, String>>()
+    val toastMessage = MutableLiveData<String>()
+    val closeDrawer = MutableLiveData<Unit>()
+
     companion object {
-        const val tag = "DrawerMenuViewModel"  // todo use this
+        const val tag = "DrawerMenuViewModel"
 
         fun createFactory(): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
@@ -22,10 +26,6 @@ class DrawerMenuViewModel: ViewModel() {
             }
         }
     }
-
-    val connectionTitles = MutableLiveData<Map<Int, String>>()  // todo rename these
-    val showToastMessage = MutableLiveData<String>()
-    val closeDrawerEvent = MutableLiveData<Unit>()  // Esemény a fiók bezárására
 
 
     fun init() {
@@ -58,10 +58,11 @@ class DrawerMenuViewModel: ViewModel() {
                 object : ICallback {
                     override fun onSuccess() {
                         updateNavigationMenuItemTitles()
-                        showToastMessage.value = "Disconnected from ${connectionService.title}"
+                        // todo remove folders of this source
+                        toastMessage.value = "Disconnected from ${connectionService.title}"
                     }
                     override fun onFailure() {
-                        showToastMessage.value = "Disconnect failed"
+                        toastMessage.value = "Disconnect failed"
                     }
                 })
         } else {
@@ -70,16 +71,16 @@ class DrawerMenuViewModel: ViewModel() {
                     override fun onSuccess() {
                         updateNavigationMenuItemTitles()
                         // todo list root folder
-                        showToastMessage.value = "Connected to ${connectionService.title}"
+                        toastMessage.value = "Connected to ${connectionService.title}"
                     }
                     override fun onFailure() {
-                        showToastMessage.value = "Disconnect failed"
+                        toastMessage.value = "Disconnect failed"
                     }
                 })
         }
     }
 
     fun closeDrawer() {
-        closeDrawerEvent.value = Unit
+        closeDrawer.value = Unit
     }
 }

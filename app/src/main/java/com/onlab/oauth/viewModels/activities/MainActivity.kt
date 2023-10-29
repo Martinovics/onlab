@@ -76,11 +76,11 @@ class MainActivity : AppCompatActivity(),
             }
         }
 
-        drawerMenuViewModel.showToastMessage.observe(this) { message ->
+        drawerMenuViewModel.toastMessage.observe(this) { message ->
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
 
-        drawerMenuViewModel.closeDrawerEvent.observe(this) {
+        drawerMenuViewModel.closeDrawer.observe(this) {
             binding.drawerLayout.closeDrawer(GravityCompat.START)
         }
 
