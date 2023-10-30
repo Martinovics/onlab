@@ -2,7 +2,6 @@ package com.onlab.oauth.viewModels
 
 import android.util.Log
 import android.view.View
-import android.widget.Toast
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -12,7 +11,7 @@ import com.onlab.oauth.classes.FolderHistory
 import com.onlab.oauth.enums.ContentType
 import com.onlab.oauth.interfaces.IRecyclerItemClickedListener
 import com.onlab.oauth.interfaces.IStorageContent
-import com.onlab.oauth.viewModels.fragments.ManageFileBottomFragment
+import com.onlab.oauth.interfaces.IStorageService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,6 +48,29 @@ class ContentBrowserViewModel: ViewModel(), IRecyclerItemClickedListener {
 
     fun init() {
         listRegisteredStorageRootFolders()
+    }
+
+
+    fun getCurrentFolderStorageService(toastMessageOnError: String = ""): Pair<IStorageContent, IStorageService>? {
+        val currentFolder = this.folderHistory.current
+        if (currentFolder == null) {
+            if (toastMessageOnError.isNotEmpty()) {
+                toastMessage.value = toastMessageOnError
+            }
+            Log.d(tag, "$toastMessageOnError. Couldn't get current folder from folder history")
+            return null
+        }
+
+        val storageService = ConnectionRepository.get(currentFolder.source.toString())?.getStorage()
+        if (storageService == null) {
+            if (toastMessageOnError.isNotEmpty()) {
+                toastMessage.value = toastMessageOnError
+            }
+            Log.d(tag, "Couldn't get storage service. Storage service ${currentFolder.source} was null")
+            return null
+        }
+
+        return Pair(currentFolder, storageService)
     }
 
 
@@ -152,8 +174,7 @@ class ContentBrowserViewModel: ViewModel(), IRecyclerItemClickedListener {
     }
 
     override fun onMoreClicked(position: Int) {  // todo
+        onItemMoreClicked.value = position
         Log.d(tag, "onMoreClicked at pos=$position")
-//        val bottomSheet = ManageFileBottomFragment(this, position)
-//        bottomSheet.show(supportFragmentManager, bottomSheet.tag)
     }
 }

@@ -30,12 +30,14 @@ import java.io.File
 import java.io.IOException
 import java.util.*
 import androidx.activity.viewModels
+import com.onlab.oauth.viewModels.AddContentViewModel
 import com.onlab.oauth.viewModels.ContentBrowserViewModel
+import com.onlab.oauth.viewModels.UploadDownloadViewModel
 
 
+@RequiresApi(Build.VERSION_CODES.M)
 class MainActivity : AppCompatActivity(),
-    IAddContentBottomFragmentListener,
-    IManageFileBottomFragmentListener
+    IManageFileBottomFragmentListener  // todo kiszervezni
 {
 
     private var TAG = this::class.java.simpleName
@@ -45,6 +47,8 @@ class MainActivity : AppCompatActivity(),
 
     private val drawerMenuViewModel: DrawerMenuViewModel by viewModels { DrawerMenuViewModel.createFactory() }
     private val contentBrowserViewModel: ContentBrowserViewModel by viewModels { ContentBrowserViewModel.createFactory() }
+    private val addContentViewModel: AddContentViewModel by viewModels { AddContentViewModel.createFactory() }
+    private val uploadDownloadViewModel: UploadDownloadViewModel by viewModels { UploadDownloadViewModel.createFactory() }
 
 
     val binding: ActivityMainBinding  // todo remove
@@ -64,11 +68,11 @@ class MainActivity : AppCompatActivity(),
         // order matters
         initToolbar()
         initRecycleView()
-        initAddContentBottomFragment()
         initConnections()
         initDrawerViewModel()
         initContentBrowserViewModel()
-        // initStorages()
+        initAddContentViewModel()
+        initUploadDownloadViewModel()
     }
 
     private fun initDrawerViewModel() {
@@ -110,8 +114,54 @@ class MainActivity : AppCompatActivity(),
                 contentBrowserViewModel.onItemLongClickedHandler(position)
             }
         }
+        contentBrowserViewModel.onItemMoreClicked.observe(this) { position ->
+            val bottomSheet = ManageFileBottomFragment(this, position)
+            bottomSheet.show(supportFragmentManager, bottomSheet.tag)
+        }
 
         contentBrowserViewModel.init()
+    }
+
+
+    private fun initAddContentViewModel() {
+        _binding.btnAddContent.setOnClickListener {
+            val bottomSheet = AddContentBottomFragment(addContentViewModel)
+            bottomSheet.show(supportFragmentManager, bottomSheet.tag)
+        }
+
+        addContentViewModel.onContentAdded.observe(this) { content ->
+            contentBrowserViewModel.contentList.add(content)
+        }
+
+        addContentViewModel.onAddPositiveClicked.observe(this) { directoryName ->
+            val folderStoragePair = contentBrowserViewModel.getCurrentFolderStorageService("Couldn't add folder")
+            if (folderStoragePair != null) {
+                val (currentFolder, storageService) = folderStoragePair
+                addContentViewModel.createFolder(currentFolder.id, directoryName, storageService)
+            }
+        }
+
+        addContentViewModel.onItemSelected.observe(this) { uri ->
+            val folderStoragePair = contentBrowserViewModel.getCurrentFolderStorageService("Couldn't upload file")
+            if (folderStoragePair != null) {
+                val (currentFolder, storageService) = folderStoragePair
+                uploadDownloadViewModel.uploadFile(uri, currentFolder, storageService, contentResolver)
+            }
+        }
+
+        addContentViewModel.init()
+    }
+
+
+    private fun initUploadDownloadViewModel() {
+        uploadDownloadViewModel.toastMessage.observe(this) { message ->
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+        uploadDownloadViewModel.onContentAdded.observe(this) { content ->
+            contentBrowserViewModel.contentList.add(content)
+        }
+
+        uploadDownloadViewModel.init()
     }
 
 
@@ -147,48 +197,12 @@ class MainActivity : AppCompatActivity(),
         ConnectionRepository.register(ContentSource.GOOGLE_DRIVE.toString(), GoogleConnectionService(this))
     }
 
-    private fun initAddContentBottomFragment() {
-        _binding.btnAddContent.setOnClickListener {
-            val bottomSheet = AddContentBottomFragment(this)
-            bottomSheet.show(supportFragmentManager, bottomSheet.tag)
-        }
-    }
-
     private fun initRecycleView() {
         _contentList = contentBrowserViewModel.contentList
         _binding.rvContents.adapter = contentList
         _binding.rvContents.layoutManager = LinearLayoutManager(this)
     }
 
-
-    override fun onAddDirectoryDialogPositiveClicked(directoryName: String) {
-        val currentFolder = this.folderHistory.current
-        if (currentFolder == null) {
-            Toast.makeText(this, "Couldn't create folder", Toast.LENGTH_SHORT).show()
-            Log.d(TAG, "Couldn't create folder. No parent directory found.")
-            return
-        }
-
-        val storageService = ConnectionRepository.get(currentFolder.source.toString())?.getStorage()
-        if (storageService == null) {
-            Toast.makeText(this, "Couldn't create folder", Toast.LENGTH_SHORT).show()
-            Log.d(TAG, "Couldn't get storage service. Storage service ${currentFolder.source} was null")
-            return
-        }
-
-        CoroutineScope(Dispatchers.Main).launch {
-            val newDirectory = storageService.createDir(currentFolder.id, directoryName)
-            if (newDirectory != null) {
-                this@MainActivity.contentList.add(newDirectory)
-                Log.d(TAG, "Created folder with name ${newDirectory.name}")
-            } else {
-                Log.d(TAG, "Couldn't create folder. Storage service returned null.")
-            }
-        }
-    }
-
-    override fun onAddDirectoryDialogNegativeClicked() {
-    }
 
     private fun getStorageService(errorMessage: String): IStorageService? {
         val currentFolder = this.folderHistory.current
@@ -206,71 +220,6 @@ class MainActivity : AppCompatActivity(),
         }
 
         return storageService
-    }
-
-    @RequiresApi(Build.VERSION_CODES.M)
-    override fun onFileBrowserItemSelected(uri: Uri) {
-        val storageService = getStorageService("File upload failed") ?: return
-        val parentFolder = folderHistory.current!!
-        val mimeType = this.contentResolver.getType(uri)
-        val fileName = this.getFileNameFromUri(uri)
-        Log.d(TAG, fileName)
-
-        Toast.makeText(this, "Uploading file", Toast.LENGTH_SHORT).show()
-        Log.d(TAG, "Uploading file to ${parentFolder.name} folder (path=${uri.path} mime=$mimeType)")
-
-        CoroutineScope(Dispatchers.Main).launch {
-            val inputStream = this@MainActivity.contentResolver.openInputStream(uri)
-            if (inputStream == null) {
-                Log.d(TAG, "Couldn't upload file. InputStream was null")
-                return@launch
-            }
-
-            // encrypt
-            val keyAlias = UUID.randomUUID().toString()
-            val secretService = EncryptionService(keyAlias)  // mert még nincs folder id-nk
-            val (isEncrypted, encryptedBytes) = secretService.encrypt(inputStream)
-
-            if (!isEncrypted) {
-                Toast.makeText(this@MainActivity, "Encryption failed", Toast.LENGTH_SHORT).show()
-                Log.d(TAG, "Encryption failed (name=$fileName)")
-            }
-
-            val uploadInputStream = ByteArrayInputStream(encryptedBytes)
-            val newFile = storageService.uploadFile(uploadInputStream, mimeType.toString(), parentFolder.id, fileName, keyAlias)
-            if (newFile != null) {
-                this@MainActivity.contentList.add(newFile)
-                Log.d(TAG, "Uploaded file with name $fileName")
-            } else {
-                secretService.deleteAlias()
-                Log.d(TAG, "Couldn't upload file with name $fileName. Storage service returned null.")
-            }
-
-            withContext(Dispatchers.IO) {
-                inputStream.close()
-            }
-        }
-
-    }
-
-    private fun getFileNameFromUri(uri: Uri): String {
-        var fileNameWithExtension: String? = null
-
-        val cursor = contentResolver.query(uri, null, null, null, null)
-        cursor?.use {
-            if (it.moveToFirst()) {
-                fileNameWithExtension = it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
-            }
-        }
-
-        if (fileNameWithExtension == null) {
-            fileNameWithExtension = uri.path?.split("/")?.last()
-        }
-        if (fileNameWithExtension == null) {
-            fileNameWithExtension = "Untitled"
-        }
-
-        return fileNameWithExtension!!
     }
 
     override fun onManageFileShareButtonClicked(position: Int) {
