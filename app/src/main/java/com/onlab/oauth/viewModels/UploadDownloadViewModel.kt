@@ -17,6 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.IOException
 import java.util.*
 
 class UploadDownloadViewModel: ViewModel() {
@@ -36,9 +38,11 @@ class UploadDownloadViewModel: ViewModel() {
         }
     }
 
+
     fun init() {
 
     }
+
 
     @RequiresApi(Build.VERSION_CODES.M)
     fun uploadFile(uri: Uri, parentFolder: IStorageContent, storageService: IStorageService, contentResolver: ContentResolver) {
@@ -83,6 +87,7 @@ class UploadDownloadViewModel: ViewModel() {
         }
     }
 
+
     private fun getFileNameFromUri(uri: Uri, contentResolver: ContentResolver): String {
         var fileNameWithExtension: String? = null
 
@@ -104,7 +109,53 @@ class UploadDownloadViewModel: ViewModel() {
     }
 
 
-    fun downloadFile() {
+    @RequiresApi(Build.VERSION_CODES.M)
+    fun downloadFile(content: IStorageContent, storageService: IStorageService, appFilesFolder: File) {
+        toastMessage.value = "Downloading file"
+        Log.d(tag, "Downloading file (name=${content.name})")
 
+        CoroutineScope(Dispatchers.Main).launch {
+            val inputStream = storageService.downloadFile(content.id)
+            if (inputStream == null) {
+                toastMessage.value = "Downloading file failed"
+                Log.d(tag, "Downloading file failed (name=${content.name})")
+                return@launch
+            }
+
+            // decrypt
+            val secretService = EncryptionService(content.keyAlias)
+            val (isDecrypted, decryptedBytes) = secretService.decrypt(inputStream)
+
+            if (!isDecrypted) {
+                toastMessage.value = "Decryption failed - Missing key"
+                Log.d(tag, "Decryption failed (name=${content.name}) - missing key ${content.id}")
+            }
+
+            val isSaved = saveFileToAppDir(decryptedBytes, content.name, appFilesFolder)
+            if (isSaved) {
+                toastMessage.value = "Downloaded file"
+                Log.d(tag, "Downloaded file: ${content.name}. Saved to default app folder")
+            } else {
+                toastMessage.value = "Saving file failed"
+                Log.d(tag, "Saved file: ${content.name}. Saved to default app folder")
+            }
+        }
+    }
+
+
+    private suspend fun saveFileToAppDir(data: ByteArray, fileName: String, appFilesFolder: File): Boolean = withContext(Dispatchers.IO) {
+        var success = true
+        val file = File(appFilesFolder, fileName)
+
+        try {
+            file.outputStream().use { outputStream ->
+                outputStream.write(data)
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+            success = false
+        }
+
+        return@withContext success
     }
 }
