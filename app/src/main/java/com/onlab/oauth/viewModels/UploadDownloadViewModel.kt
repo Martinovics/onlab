@@ -62,6 +62,7 @@ class UploadDownloadViewModel: ViewModel() {
 
             // encrypt
             val keyAlias = UUID.randomUUID().toString()
+            Log.d(tag, "upload key alias: $keyAlias")
             val secretService = EncryptionService(keyAlias)  // mert még nincs folder id-nk
             val (isEncrypted, encryptedBytes) = secretService.encrypt(inputStream)
 
@@ -122,13 +123,15 @@ class UploadDownloadViewModel: ViewModel() {
                 return@launch
             }
 
+            Log.d(tag, "download key alias: ${content.keyAlias}")
+
             // decrypt
             val secretService = EncryptionService(content.keyAlias)
             val (isDecrypted, decryptedBytes) = secretService.decrypt(inputStream)
 
             if (!isDecrypted) {
                 toastMessage.value = "Decryption failed - Missing key"
-                Log.d(tag, "Decryption failed (name=${content.name}) - missing key ${content.id}")
+                Log.d(tag, "Decryption failed (name=${content.name}) - missing key ${content.keyAlias}")
             }
 
             val isSaved = saveFileToAppDir(decryptedBytes, content.name, appFilesFolder)

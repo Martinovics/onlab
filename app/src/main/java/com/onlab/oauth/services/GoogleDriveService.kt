@@ -40,7 +40,7 @@ class GoogleDriveService(private val drive: Drive) : IStorageService {
     private fun fetchDirectoryById(directoryID: String): List<File>? {
         return try {
             val query = "'$directoryID' in parents and trashed=false"  // safe: it's not and sql querry
-            val result = drive.files().list().setQ(query).execute()
+            val result = drive.files().list().setQ(query).setFields("files(id, name, mimeType, properties)").execute()
             result.files ?: emptyList()
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching files from Drive: ${e.localizedMessage}", e)
