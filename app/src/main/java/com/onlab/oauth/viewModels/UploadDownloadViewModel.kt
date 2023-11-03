@@ -44,7 +44,7 @@ class UploadDownloadViewModel: ViewModel() {
     }
 
 
-    @RequiresApi(Build.VERSION_CODES.M)
+    @RequiresApi(Build.VERSION_CODES.R)
     fun uploadFile(uri: Uri, parentFolder: IStorageContent, storageService: IStorageService, contentResolver: ContentResolver) {
         val mimeType = contentResolver.getType(uri)
         val fileName = this.getFileNameFromUri(uri, contentResolver)
@@ -110,7 +110,7 @@ class UploadDownloadViewModel: ViewModel() {
     }
 
 
-    @RequiresApi(Build.VERSION_CODES.M)
+    @RequiresApi(Build.VERSION_CODES.R)
     fun downloadFile(content: IStorageContent, storageService: IStorageService, appFilesFolder: File) {
         toastMessage.value = "Downloading file"
         Log.d(tag, "Downloading file (name=${content.name})")

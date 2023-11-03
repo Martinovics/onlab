@@ -15,7 +15,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.IvParameterSpec
 
-@RequiresApi(Build.VERSION_CODES.M)
+@RequiresApi(Build.VERSION_CODES.R)
 class EncryptionService(private var alias: String) {
 
     private companion object {
@@ -41,8 +41,9 @@ class EncryptionService(private var alias: String) {
         val builder = KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(BLOCK_MODE)
             .setEncryptionPaddings(PADDING)
-            .setUserAuthenticationRequired(false)
             .setRandomizedEncryptionRequired(true)
+            .setUserAuthenticationRequired(true)
+            .setUserAuthenticationParameters(180, KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL)
         keyGenerator.init(builder.build())
         return keyGenerator.generateKey()
     }
