@@ -27,7 +27,6 @@ import com.onlab.oauth.viewModels.*
 class MainActivity : AppCompatActivity() {
     private val tag = "MainActivity"
     private lateinit var binding: ActivityMainBinding
-    private lateinit var contentList: ContentBrowserAdapter
 
     private val drawerMenuViewModel: DrawerMenuViewModel by viewModels { DrawerMenuViewModel.createFactory() }
     private val contentBrowserViewModel: ContentBrowserViewModel by viewModels { ContentBrowserViewModel.createFactory() }
@@ -60,8 +59,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun initRecycleView() {
-        contentList = contentBrowserViewModel.contentList
-        this.binding.rvContents.adapter = contentList
+        this.binding.rvContents.adapter = contentBrowserViewModel.contentList
         this.binding.rvContents.layoutManager = LinearLayoutManager(this)
     }
 
